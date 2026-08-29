@@ -1,0 +1,42 @@
+# FreeImg - Public .htaccess
+# 用于 Apache（Nginx 见 .nginx.conf）
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 安全：禁止访问敏感目录
+    RewriteRule ^(config|database|app|views|install\.lock|\.git|\.env) - [F,L]
+
+    # 静态资源直读（包括 uploads/ 和 img/ 通过符号链接到 storage/images）
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 其他请求 → index.php
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# 禁止访问 PHP 文件源码（除非通过 index.php）
+<FilesMatch "\.(env|sql|md|lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 安全头
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # 上传图片缓存 30 天
+    <FilesMatch "\.(jpg|jpeg|png|gif|webp|bmp|svg)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+</IfModule>
+
+# PHP 设置
+<IfModule mod_php.c>
+    php_value upload_max_filesize 20M
+    php_value post_max_size 20M
+    php_value max_execution_time 60
+</IfModule>

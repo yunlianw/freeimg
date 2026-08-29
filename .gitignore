@@ -1,0 +1,16 @@
+public/img/*
+!public/img/.gitkeep
+public/storage/*
+!public/storage/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep
+storage/backup/*
+storage/cache/*
+!storage/cache/.gitkeep
+config/config.php
+*.bak
+*.backup.*
+*.log
+*.lock
+public/uploads
+node_modules/

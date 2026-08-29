@@ -1,0 +1,64 @@
+<?php
+/**
+ * FreeImg 配置文件
+ * 此文件由安装程序自动生成，请勿手工修改（除非你知道自己在做什么）
+ */
+
+return [
+    // 应用
+    'app' => [
+        'name'           => 'FreeImg',
+        'url'            => 'https://pic.5276.net',
+        'timezone'       => 'Asia/Shanghai',
+        'debug'          => false,
+        'encryption_key' => '5fbfd84de368a55c96be4e21bd790e3cd2e906441056ee834fa2ecd045d273a1',
+    ],
+
+    // 数据库
+    'database' => [
+        'host'     => '127.0.0.1',
+        'port'     => 3306,
+        'dbname'   => 'pic_5276_net',
+        'username' => 'pic_5276_net',
+        'password' => 'dbCKJMFMZ7DkGZ9a',
+        'charset'  => 'utf8mb4',
+        'collation'=> 'utf8mb4_general_ci',
+    ],
+
+    // Session
+    'session' => [
+        'name'           => 'FREEIMG_SESS',
+        'lifetime'       => 7200,
+        'cookie_secure'  => false,
+        'cookie_httponly'=> true,
+        'cookie_samesite'=> 'Lax',
+    ],
+
+    // 上传
+    'upload' => [
+        'max_size'      => 10 * 1024 * 1024, // 10MB
+        'allowed_types' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
+        'chunk_size'    => 2 * 1024 * 1024,
+    ],
+
+    // 图片处理
+    'image' => [
+        'driver'          => 'gd', // gd 或 imagick
+        'default_quality' => 85,
+        'max_width'       => 4096,
+        'max_height'      => 4096,
+    ],
+
+    // 存储
+    'storage' => [
+        'default'   => 'local',
+        'local_path'=> __DIR__ . '/../storage/images',
+        'local_url' => '/uploads',
+    ],
+
+    // 日志
+    'log' => [
+        'level'   => 'info',
+        'channel' => 'file',
+    ],
+];
