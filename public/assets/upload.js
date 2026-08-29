@@ -40,6 +40,9 @@
     const csrfInput = document.getElementById('freeimg-csrf');
     const customPathInput = document.getElementById('custom-path');
     const publicCheckbox = document.getElementById('is-public');
+    // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
+    const browserMode = (document.getElementById('browser-mode') || {}).value || 'browser';
+    const isBackendOnly = browserMode === 'backend';
     const keepNameCheckbox = document.getElementById('keep-name-checkbox');
     const dirSuggestions = document.getElementById('dir-suggestions');
     const enableExpiryCheckbox = document.getElementById('enable-expiry-checkbox');
@@ -114,7 +117,17 @@
         item.currentPreset = preset;
         const presetCfg = QUALITY_PRESETS[preset] || QUALITY_PRESETS.balanced;
         try {
-            if (presetCfg.maxDim === 0 && presetCfg.quality >= 1.0) {
+            // Phase 9.3: 仅后端压缩模式 → 前端不压缩，原图直传
+            if (isBackendOnly) {
+                item.compressed = {
+                    blob: item.originalFile,
+                    size: item.originalFile.size,
+                    dataUrl: null,
+                };
+                item.preview.style.display = 'none';
+                item.statusEl.textContent = '✓ 原图（后端压缩）';
+                item.statusEl.className = 'pending-status ready';
+            } else if (presetCfg.maxDim === 0 && presetCfg.quality >= 1.0) {
                 // 原图：不压缩
                 item.compressed = {
                     blob: item.originalFile,
@@ -171,7 +184,7 @@
             try {
                 item.statusEl.textContent = '⬆️ 上传中…';
                 item.statusEl.className = 'pending-status uploading';
-                const res = await uploadOne(item.compressed.blob, item.originalFile.name.replace(/\.[^.]+$/, '.jpg'), item.progressBar);
+                const res = await uploadOne(item.compressed.blob, item.originalFile.name.replace(/\.[^.]+$/, '.jpg'), item.progressBar, item.originalFile.size);
                 item.statusEl.textContent = '✅ 完成';
                 item.statusEl.className = 'pending-status success';
                 if (res && res.image) {
@@ -240,11 +253,23 @@
     }
 
     // === 单文件上传 ===
-    function uploadOne(blob, filename, progressBar) {
+    function uploadOne(blob, filename, progressBar, originalSize) {
         return new Promise((resolve, reject) => {
             const fd = new FormData();
             fd.append('csrf_token', csrfInput.value);
             fd.append('files[]', blob, filename);
+            // Phase 9.3: 浏览器上传压缩模式
+            //  - browser: 前端已压缩 → 后端跳过（skip_compress=1）
+            //  - double : 前端压缩后后端再压（不传 skip_compress）
+            //  - backend: 原图直传，后端统一压缩（不传 skip_compress）
+            if (browserMode === 'browser') {
+                fd.append('skip_compress', '1');
+            }
+            // 把真正的原图大小传给后端（用于计算节省%）
+            // 注意：backend 模式原图直传 → original_size 即实际大小，不传让后端用 $_FILES size
+            if (browserMode !== 'backend' && originalSize && originalSize > 0) {
+                fd.append('original_size', String(originalSize));
+            }
             fd.append('quality', qualitySelect.value);
             fd.append('is_public', publicCheckbox && publicCheckbox.checked ? 1 : 0);
             const customPath = customPathInput ? customPathInput.value.trim() : '';

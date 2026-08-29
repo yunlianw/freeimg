@@ -30,8 +30,22 @@
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="form-group" style="margin:0;">
+            <label>🖥️ 浏览器上传压缩</label>
+            <select name="browser_mode">
+                <option value="double" <?= $browserMode === 'double' ? 'selected' : '' ?>>双重压缩（浏览器 + 后端）</option>
+                <option value="browser" <?= $browserMode === 'browser' ? 'selected' : '' ?>>仅浏览器压缩</option>
+                <option value="backend" <?= $browserMode === 'backend' ? 'selected' : '' ?>>仅后端压缩（原图直传）</option>
+            </select>
+        </div>
         <button type="submit" class="btn-primary">💾 保存默认档位</button>
     </form>
+    <div style="font-size:12px; color:var(--gray-400); margin-top:8px;">
+        🖥️ 浏览器上传压缩模式说明：
+        <b>双重压缩</b> = 浏览器先压一遍 + 后端再按 Web 档位压一遍（体积最小，CPU 双倍）；
+        <b>仅浏览器压缩</b> = 前端 canvas 压缩后直接存（速度快，体积一般）；
+        <b>仅后端压缩</b> = 原图直传，后端统一按 Web 档位压（前端不耗性能）。
+    </div>
 </div>
 
 <!-- 预设列表 -->

@@ -30,7 +30,7 @@ class StorageController
             $cfg = json_decode(decrypt_secret($r['config']), true) ?: [];
             $driver = $drivers[$r['driver']] ?? ['label' => $r['driver'], 'icon' => '📦'];
             $capacityMb = (int)($r['max_capacity_mb'] ?? 0);
-            $usedMb = (int)$r['current_usage_mb'];
+            $usedMb = (float)$r['current_usage_mb'];
             $isFull = StorageManager::isFull($r);
             $list[] = [
                 'id'         => (int)$r['id'],
@@ -290,7 +290,7 @@ class StorageController
             Response::redirect(base_url('storages'));
         }
         $mb = StorageManager::recalcUsage($id);
-        flash('success', "已重新计算容量：" . number_format($mb / 1024 / 1024, 2) . ' GB');
+        flash('success', "已重新计算容量：" . number_format($mb / 1024, 2) . ' GB');
         Response::redirect(base_url('storages'));
     }
 

@@ -104,6 +104,8 @@ class Installer
             ['default_compression', 'balanced', 'image'],
             ['allow_signup', '0', 'auth'],
             ['maintenance_mode', '0', 'general'],
+            // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
+            ['browser_upload_mode', 'browser', 'image'],
         ];
         $stmt = $this->pdo->prepare("INSERT IGNORE INTO settings (`key`, `value`, `group`, created_at) VALUES (?, ?, ?, NOW())");
         foreach ($defaults as $s) {
@@ -132,6 +134,12 @@ class Installer
         foreach ($profiles as $p) {
             $stmt->execute($p);
         }
+
+        // Phase 9.3: profiles 插入后（id 1-6 稳定）再设 Web/API 默认档
+        // 均衡(id=3) 为 Web 默认，极限省流(id=5) 为 API 默认
+        $stmt2 = $this->pdo->prepare("INSERT IGNORE INTO settings (`key`, `value`, `group`, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt2->execute(['web_compression_profile_id', '3', 'image']);
+        $stmt2->execute(['api_compression_profile_id', '5', 'image']);
     }
 
     /**

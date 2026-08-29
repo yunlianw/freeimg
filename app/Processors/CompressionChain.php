@@ -76,6 +76,7 @@ class CompressionChain
         $srcSize = filesize($inputFile);
 
         // GIF：原样保留（不动图）
+        // 注意：$inputFile 在 chain 同步调用期间始终有效（$_FILES 临时文件请求结束才清理）
         if ($realMime === 'image/gif') {
             return [
                 'success' => true,
@@ -86,7 +87,7 @@ class CompressionChain
                 'compressor' => 'original',
                 'compression_source' => 'none',
                 'preserved_original' => true,
-                'output_path' => $tempIn,
+                'output_path' => $inputFile,
             ];
         }
 
@@ -102,26 +103,38 @@ class CompressionChain
         $tmpDest = $tempIn . '.cmp';
         $result = null;
 
+        // 选处理器
+        // 水印开启时：PNG 也必须走 GdProcessor（GdPngProcessor 不画水印）
+        $hasWatermark = !empty($opts['watermark']) && is_array($opts['watermark']);
         if ($realMime === 'image/png') {
-            $result = $this->pngquant->compress($tempIn, $tmpDest, $opts);
+            $result = $hasWatermark
+                ? $this->gd->compress($tempIn, $tmpDest, $opts)
+                : $this->pngquant->compress($tempIn, $tmpDest, $opts);
         } elseif ($realMime === 'image/jpeg') {
             $result = $this->gd->compress($tempIn, $tmpDest, $opts);
         } elseif ($realMime === 'image/webp') {
             $result = $this->gd->compress($tempIn, $tmpDest, $opts);
         } else {
-            // 未知 MIME → fallback 用原文件
-            @unlink($tmpDest);
-            return [
-                'success' => true,
-                'size'    => $srcSize,
-                'mime'    => $realMime,
-                'extension' => $this->mimeToExt($realMime),
-                'compression_ratio' => 1.0,
-                'compressor' => 'original',
-                'compression_source' => 'none',
-                'preserved_original' => true,
-                'output_path' => $tempIn,
-            ];
+            // 未知 MIME（bmp 等）：水印开启时尝试 GD 兜底（GD 支持 bmp 读写）
+            if ($hasWatermark) {
+                $result = $this->gd->compress($tempIn, $tmpDest, $opts);
+            } else {
+                $result = null;
+            }
+            if (empty($result['success'])) {
+                @unlink($tmpDest);
+                return [
+                    'success' => true,
+                    'size'    => $srcSize,
+                    'mime'    => $realMime,
+                    'extension' => $this->mimeToExt($realMime),
+                    'compression_ratio' => 1.0,
+                    'compressor' => 'original',
+                    'compression_source' => 'none',
+                    'preserved_original' => true,
+                    'output_path' => $tempIn,
+                ];
+            }
         }
 
         // 处理器失败：原样保留
@@ -141,8 +154,10 @@ class CompressionChain
         }
 
         // 比大小：压缩后 >= 原图 → 保留原图
+        // 例外：启用水印时不能保留原图（水印已画在 .cmp 上，保留原图=丢水印）
         $cmpSize = (int)($result['size'] ?? 0);
-        if ($cmpSize >= $srcSize) {
+        $hasWatermark = !empty($opts['watermark']) && is_array($opts['watermark']);
+        if ($cmpSize >= $srcSize && !$hasWatermark) {
             @unlink($tmpDest);
             return [
                 'success' => true,
@@ -186,8 +201,20 @@ class CompressionChain
      */
     public function cleanup(?string $outputPath): void
     {
-        if ($outputPath && file_exists($outputPath)) {
+        if (!$outputPath) return;
+        // 删 final 产物
+        if (file_exists($outputPath)) {
             @unlink($outputPath);
+        }
+        // 删 tempIn 输入副本（.final 去掉后缀即是）
+        $tempIn = preg_replace('/\.final$/', '', $outputPath);
+        if ($tempIn !== $outputPath && file_exists($tempIn)) {
+            @unlink($tempIn);
+        }
+        // 删 .cmp 中间产物
+        $cmp = $tempIn . '.cmp';
+        if (file_exists($cmp)) {
+            @unlink($cmp);
         }
     }
 

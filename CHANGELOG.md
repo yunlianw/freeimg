@@ -18,6 +18,62 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [1.1.3-alpha] - 2026-08-30
+
+Phase 9.3：浏览器上传压缩三模式 + 压缩系统缺陷修复 + 老季数据恢复。
+
+### ✨ 新增
+
+#### 浏览器上传压缩三模式（后台可切换）
+- 新增设置项 `browser_upload_mode`：**double / browser / backend**（默认 **double**）
+- **双重压缩（double）**：前端 canvas 压缩 → 后端按 Web 默认档再压缩（体积最小）
+- **仅浏览器压缩（browser）**：前端压缩 → 后端跳过（仅加水印除外）
+- **仅后端压缩（backend）**：原图直传 → 后端按 Web 默认档压缩
+- 后台「压缩配置」页面新增下拉切换，含三模式说明文案
+- 实测：1.1MB 原图 → 双重压缩 98KB（省 91%）
+
+#### 老季数据恢复（binlog）
+- 从 `mysql-bin.000010` binlog 提取并恢复 3 张图 DB 记录（id 185/186/187，宽高/大小正确）
+- 物理文件因被 rm 无法找回，需老季重新上传
+
+### 🐛 修复（龙虾二号两轮审查 15 项）
+
+**Phase 9.3 关键修复**
+- **isFull 公式**：移除 `* 1024`（current_usage_mb 已是真实 MB）
+- **original_size 防护**：拒绝伪造（claimed < realSize → 忽略；claimed > maxSize×2 → 忽略）
+- **水印解耦**：`_force_watermark` 强制走压缩链（防浏览器路径绕过水印）
+- **保留元数据**：详情页正确显示尺寸/原大小/节省%/压缩方法
+
+**严重缺陷（龙虾二号第二轮 P1-P6）**
+- **P1 [严重]** GIF 上传 HTTP 500/502：chain GIF 分支 output_path 用了未赋值的 `$tempIn` → 改 `$inputFile`
+- **P2 [严重]** PNG/WebP/BMP 水印全部绕过（GdPngProcessor 无 watermark 代码）→ chain PNG 分支：水印开走 GdProcessor；未知 MIME 水印兜底
+- **P3 [中]** 每次压缩泄漏 2 个 /tmp 文件 → chain cleanup 同时删 .final/tempIn/.cmp；UploadService 失败路径也 unlink
+- **P4 [中]** "省流"档位静默失效（small vs saver 不统一）→ 统一 `saver`
+- **P5 [低]** DECIMAL(12,4) 视图截断 <1MB 显示 0MB → 改 (float) + 自动单位
+- **P6 [低]** 20MB 硬编码改配置；删未使用变量；删空调试文件
+
+**存储容量显示**
+- `addUsage`/`recalcUsage` 公式改 `bytes/1048576`（真实 MB）
+- 字段类型 `current_usage_mb`：`bigint` → `decimal(12,4)`（支持小数累积）
+- 视图自动选单位 B/KB/MB/GB（修复假 0.51 GB 显示）
+- 实测：4 张图真实 291.7 KB
+
+**其他修复**
+- `setSetting` 签名放宽支持 `string|int`（修 string 设置报 TypeError 500）
+- `original_mime`/`original_extension`/`compressor`/`compression_source` 字段填充
+- skip_compress+水印：chain max_width=0/quality=85（不缩放只加水印，避免 q92 膨胀）
+- compressor 语义：browser 链路标 browser；double 真压缩标 gd
+
+### 🚨 事故记录
+
+- **PHP-FPM 崩溃 3 分钟（02:55-02:58）**：reload 时遇 cleanup 边界异常，FPM master 主动终止 → 自动恢复
+  - **教训**：不再主动 `kill -USR2` reload PHP-FPM（强化红线）
+- **误删 3 张图物理文件**：清理测试数据时范围误判
+  - DB 记录已 binlog 恢复；物理文件 rm 无法找回
+  - 老季表态："现在是开发测试环境 没有真正运营 删除都没事"
+
+---
+
 ## [1.1.2-alpha] - 2026-08-30
 
 Phase 9.2：压缩系统全面重构。
@@ -69,7 +125,7 @@ Phase 9.2：压缩系统全面重构。
 ### 📝 文档
 - README.md v1.1.2 路线图更新
 
-### 实测压缩效果（典型 RGBA 透明 PNG）
+### 实测压缩效果（老季那张 RGBA 截图 40591B）
 
 | 档位 | 原 KB | 最终 KB | 节省% |
 |---|---|---|---|
@@ -79,7 +135,7 @@ Phase 9.2：压缩系统全面重构。
 | small | 40.6 | 15.7 | 61.2% |
 | **extreme** | 40.6 | **14.4** | **64.6%** |
 
-之前压缩只省约 20%——现在**省64%**。
+之前老季抱怨"压缩只省20%"——现在**省64%**。
 
 ---
 

@@ -17,7 +17,7 @@
  * 依赖：本地 GD + CompressionChain + 8 张测试图
  */
 
-define('FREEIMG_ROOT', '/www/wwwroot/freeimg');
+define('FREEIMG_ROOT', '/www/wwwroot/pic.5276.net');
 
 function expectedMimeForPath(string $path): string {
     $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));

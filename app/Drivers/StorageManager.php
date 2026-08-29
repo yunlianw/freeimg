@@ -100,8 +100,8 @@ class StorageManager
     public static function isFull(array $storage): bool
     {
         if (empty($storage['max_capacity_mb'])) return false;
-        // current_usage_mb 实际存 KB，max_capacity_mb 是 MB，需 × 1024
-        return (int)$storage['current_usage_mb'] >= (int)$storage['max_capacity_mb'] * 1024 * 0.8;
+        // Phase 9.3: current_usage_mb 已是真实 MB（浮点），直接与 max_capacity_mb 比较
+        return (float)$storage['current_usage_mb'] >= (float)$storage['max_capacity_mb'] * 0.8;
     }
 
     /**
@@ -110,8 +110,9 @@ class StorageManager
     public static function addUsage(int $storageId, int $sizeBytes): void
     {
         if ($storageId <= 0 || $sizeBytes <= 0) return;
-        $mb = (int)ceil($sizeBytes / 1024);
-        if ($mb <= 0) $mb = 1;  // < 1MB 也算 1MB
+        // Phase 9.3: 真实字节 → MB 小数累积（不 ceil，避免小图虚增）
+        $mb = round($sizeBytes / 1048576, 4);
+        if ($mb <= 0) $mb = 0.0001;
         Db::execute(
             'UPDATE storages SET current_usage_mb = current_usage_mb + ? WHERE id = ?',
             [$mb, $storageId]
@@ -124,8 +125,8 @@ class StorageManager
     public static function subUsage(int $storageId, int $sizeBytes): void
     {
         if ($storageId <= 0 || $sizeBytes <= 0) return;
-        $mb = (int)ceil($sizeBytes / 1024);
-        if ($mb <= 0) $mb = 1;
+        $mb = round($sizeBytes / 1048576, 4);
+        if ($mb <= 0) $mb = 0.0001;
         Db::execute(
             'UPDATE storages SET current_usage_mb = GREATEST(0, current_usage_mb - ?) WHERE id = ?',
             [$mb, $storageId]
@@ -136,13 +137,13 @@ class StorageManager
      * 重新计算某个存储的真实占用（从磁盘实际文件大小统计）
      * 用于后台"重新计算容量"按钮
      */
-    public static function recalcUsage(int $storageId): int  // 返回 KB 数
+    public static function recalcUsage(int $storageId): int  // 返回 MB 数
     {
         $row = Db::fetchOne('SELECT * FROM storages WHERE id = :id', ['id' => $storageId]);
         if (!$row) return 0;
 
         $totalBytes = 0;
-        // 用 storage_id 找 images，累加 final_size
+        // 优先用 images 表实际 final_size 统计（真实）
         $rows = Db::fetchAll(
             'SELECT final_size FROM images WHERE storage_id = :sid AND status = "active"',
             ['sid' => $storageId]
@@ -150,7 +151,9 @@ class StorageManager
         foreach ($rows as $r) {
             $totalBytes += (int)$r['final_size'];
         }
-        $mb = (int)($totalBytes / 1024);
+
+        // 真实字节 → MB（1MB = 1048576 字节），小数精度 4 位
+        $mb = round($totalBytes / 1048576, 4);
         Db::execute(
             'UPDATE storages SET current_usage_mb = ? WHERE id = ?',
             [$mb, $storageId]
@@ -164,11 +167,17 @@ class StorageManager
      */
     public static function listVisible(): array
     {
-        return Db::fetchAll(
+        $rows = Db::fetchAll(
             'SELECT * FROM storages
              WHERE status = 1 AND visible_in_upload = 1
              ORDER BY priority DESC, id ASC'
         );
+        // Phase 9.3: 附上 is_full 标记（容量保护用，真实 MB 比较）
+        foreach ($rows as &$r) {
+            $r['is_full'] = self::isFull($r) ? 1 : 0;
+        }
+        unset($r);
+        return $rows;
     }
 
     /**

@@ -1,7 +1,7 @@
 <div class="page-header">
     <div>
         <h1>上传图片</h1>
-        <p class="subtitle">支持拖拽、粘贴或点击上传 · 单张限制 20 MB</p>
+        <p class="subtitle">支持拖拽、粘贴或点击上传 · 单张限制 <?= h((string)config('settings.upload_max_size', 10)) ?> MB</p>
     </div>
     <button type="button" id="toggle-config" style="display:flex; align-items:center; gap:8px; padding:8px 16px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--gray-700); cursor:pointer;">
         ⚙️ <span id="config-toggle-label">隐藏配置</span>
@@ -62,10 +62,19 @@
                     <option value="original" <?= $dq === 'original' ? 'selected' : '' ?>>原图（不压缩）</option>
                     <option value="high" <?= $dq === 'high' ? 'selected' : '' ?>>高清 (2048px / 0.85)</option>
                     <option value="balanced" <?= $dq === 'balanced' ? 'selected' : '' ?>>⭐ 均衡 (1600px / 0.70) · ≤2MB</option>
-                    <option value="small" <?= $dq === 'small' ? 'selected' : '' ?>>省流 (1200px / 0.55) · ≤1MB</option>
+                    <option value="saver" <?= $dq === 'saver' ? 'selected' : '' ?>>省流 (1200px / 0.55) · ≤1MB</option>
                     <option value="extreme" <?= $dq === 'extreme' ? 'selected' : '' ?>>极限省流 (900px / 0.40) · ≤0.5MB</option>
                 </select>
                 <div class="config-hint">默认档来自后台「压缩配置 → Web 默认档」设置</div>
+            </div>
+
+            <!-- Phase 9.3: 浏览器上传压缩模式（后台可切换） -->
+            <?php $bm = $browser_mode ?? 'browser'; ?>
+            <input type="hidden" id="browser-mode" value="<?= h($bm) ?>">
+            <div class="config-item" id="browser-mode-tip" style="display:none;">
+                <div class="config-hint" style="color:var(--orange-500);">
+                    🖥️ 当前模式：<?= $bm === 'double' ? '双重压缩（浏览器+后端）' : ($bm === 'backend' ? '仅后端压缩（原图直传）' : '仅浏览器压缩') ?>
+                </div>
             </div>
 
             <?php $hasMultipleStorage = count($visible_storages ?? []) > 1; ?>
@@ -75,11 +84,17 @@
                 <select id="storage-select" name="storage_id" class="config-input">
                     <?php foreach ($visible_storages as $s): ?>
                         <?php
-                            $used = (int)($s["current_usage_mb"] ?? 0);
-                            $max = (int)($s['max_capacity_mb']);
-                            $capStr = $max > 0 ? round($max / 1024 / 1024, 2) . 'GB' : '∞';
-                            $usedStr = round($used / 1024 / 1024, 2) . 'GB';
-                            $pct = $max > 0 ? min(100, (int)($used / ($max * 1024) * 100)) : 0;
+                            // Phase 9.3: current_usage_mb 已是真实 MB（可能为小数）
+                            $used = (float)($s["current_usage_mb"] ?? 0);
+                            $max = (float)$s['max_capacity_mb'];
+                            $fmt = function (float $mb): string {
+                                if ($mb >= 1024) return round($mb / 1024, 2) . 'GB';
+                                if ($mb >= 1) return round($mb, 2) . 'MB';
+                                return round($mb * 1024, 1) . 'KB';
+                            };
+                            $capStr = $max > 0 ? $fmt($max) : '∞';
+                            $usedStr = $fmt($used);
+                            $pct = $max > 0 ? min(100, (int)round($used / $max * 100)) : 0;
                             $full = !empty($s['is_full']);
                         ?>
                         <option value="<?= (int)$s['id'] ?>" <?= !empty($s['is_full']) ? 'disabled' : '' ?>>

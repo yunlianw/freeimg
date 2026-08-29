@@ -112,7 +112,7 @@ function current_url(): string
 
 /**
  * 当前请求的 origin（scheme + host，无 path）
- * 例：https://your-domain.com
+ * 例：https://pic.5276.net
  * 注意：HTTP_HOST 可能被反代/客户端伪造，生产环境如用 CDN 请设置 config.app.force_url=true 走写死值
  */
 function base_origin(): string

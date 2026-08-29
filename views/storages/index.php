@@ -62,21 +62,38 @@
                     <td style="padding:12px 16px; min-width:160px;">
                         <?php if ($s['max_capacity_mb'] > 0): ?>
                             <?php
-                                $usedKb = (int)$s['current_usage_mb'];  // 实际存 KB
-                                $maxMb = (int)$s['max_capacity_mb'];
-                                $pct = $maxMb > 0 ? min(100, (int)($usedKb / ($maxMb * 1024) * 100)) : 0;
+                                // Phase 9.3: current_usage_mb 已是真实 MB（可能为小数）
+                                $usedMb = (float)$s['current_usage_mb'];
+                                $maxMb = (float)$s['max_capacity_mb'];
+                                $pct = $maxMb > 0 ? min(100, (int)round($usedMb / $maxMb * 100)) : 0;
                                 $color = $pct >= 80 ? '#dc2626' : ($pct >= 60 ? '#f59e0b' : '#10b981');
+                                // 自动选单位显示（支持小数 MB）
+                                $fmtMb = function (float $mb): string {
+                                    if ($mb >= 1024) return number_format($mb / 1024, 2) . ' GB';
+                                    if ($mb >= 1) return number_format($mb, 2) . ' MB';
+                                    return round($mb * 1024, 1) . ' KB';
+                                };
                             ?>
                             <div style="font-size:12px; color:var(--gray-600); margin-bottom:4px;">
-                                <?= number_format($usedKb / 1024 / 1024, 2) ?> / <?= number_format($maxMb / 1024, 2) ?> GB
+                                <?= $fmtMb($usedMb) ?> / <?= $fmtMb($maxMb) ?>
                                 <span style="color:<?= $color ?>; font-weight:600; margin-left:4px;"><?= $pct ?>%</span>
                             </div>
                             <div style="height:6px; background:var(--gray-200); border-radius:3px; overflow:hidden;">
                                 <div style="height:100%; background:<?= $color ?>; width:<?= min(100, $pct) ?>%;"></div>
                             </div>
                         <?php else: ?>
+                            <?php
+                                // Phase 9.3: 真实容量显示（自动选单位，支持小数 MB）
+                                $usedBytes = (float)$s['current_usage_mb'] * 1048576;
+                                $fmt = function (float $bytes): string {
+                                    if ($bytes >= 1073741824) return number_format($bytes / 1073741824, 2) . ' GB';
+                                    if ($bytes >= 1048576)   return number_format($bytes / 1048576, 2) . ' MB';
+                                    if ($bytes >= 1024)       return number_format($bytes / 1024, 1) . ' KB';
+                                    return round($bytes) . ' B';
+                                };
+                            ?>
                             <div style="font-size:12px; color:var(--gray-500);">∞ 无限制</div>
-                            <div style="font-size:11px; color:var(--gray-400); margin-top:2px;">已用 <?= number_format((float)$s['current_usage_mb'] / 1024, 2) ?> GB</div>
+                            <div style="font-size:11px; color:var(--gray-400); margin-top:2px;">已用 <?= $fmt($usedBytes) ?></div>
                         <?php endif; ?>
                     </td>
                     <td style="padding:12px 16px; text-align:right; white-space:nowrap;">

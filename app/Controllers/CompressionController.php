@@ -28,11 +28,17 @@ class CompressionController
         $all = Db::fetchAll('SELECT * FROM compression_profiles ORDER BY sort_order ASC, id ASC');
         $webDefault  = (int)(config('settings.web_compression_profile_id') ?? 0);
         $apiDefault  = (int)(config('settings.api_compression_profile_id') ?? 0);
+        // Phase 9.3: 浏览器上传压缩模式（默认 browser=仅浏览器压缩）
+        $browserMode = (string)(config('settings.browser_upload_mode') ?? 'browser');
+        if (!in_array($browserMode, ['double', 'browser', 'backend'], true)) {
+            $browserMode = 'browser';
+        }
 
         Response::view('compression/index', [
             'profiles'   => $all,
             'webDefault' => $webDefault,
             'apiDefault' => $apiDefault,
+            'browserMode' => $browserMode,
             'csrf'       => csrf_token(),
         ], 'main');
     }
@@ -154,7 +160,7 @@ class CompressionController
         Response::redirect(base_url('compression'));
     }
 
-    /** 设置 web/API 默认档位 */
+    /** 设置 web/API 默认档位 + 浏览器上传压缩模式 */
     public function defaults(Request $request): void
     {
         if (!csrf_check($request->post('csrf_token', ''))) {
@@ -164,6 +170,11 @@ class CompressionController
 
         $webId = (int)$request->post('web_default', 0);
         $apiId = (int)$request->post('api_default', 0);
+        // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
+        $browserMode = (string)$request->post('browser_mode', 'browser');
+        if (!in_array($browserMode, ['double', 'browser', 'backend'], true)) {
+            $browserMode = 'browser';
+        }
 
         if ($webId && !$this->profiles->find($webId)) {
             flash('error', 'Web 默认档位不存在');
@@ -176,6 +187,7 @@ class CompressionController
 
         $this->setSetting('web_compression_profile_id', $webId);
         $this->setSetting('api_compression_profile_id', $apiId);
+        $this->setSetting('browser_upload_mode', $browserMode);
         flash('success', '默认档位已保存');
         Response::redirect(base_url('compression'));
     }
@@ -196,7 +208,7 @@ class CompressionController
         ];
     }
 
-    private function setSetting(string $key, int $value): void
+    private function setSetting(string $key, string|int $value): void
     {
         $exists = Db::fetchValue('SELECT COUNT(*) FROM settings WHERE `key` = ?', [$key]);
         if ($exists) {

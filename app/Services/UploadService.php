@@ -33,19 +33,35 @@ class UploadService
         }
 
         $originalName = $this->sanitizeName($file['name'] ?? 'image');
-        $originalSize = (int)$file['size'];
+        // Phase 9.3: 浏览器压缩后上传 → 前端传 original_size（真正的原图字节数）
+        // 安全：original_size 不允许小于实际收到内容大小（防伪造绕过限制）
+        // 也不允许超过 maxSize 的 2 倍（防恶意虚增导致 ratio 荒谬）
         $content = file_get_contents($tmp);
         if ($content === false || $content === '') {
             return $this->fail('读取上传文件失败');
         }
+        $realSize = strlen($content);
+        $claimedOrig = !empty($opts['original_size']) ? (int)$opts['original_size'] : 0;
+        $maxSize = (int)(config('upload.max_size') ?? 10 * 1024 * 1024);
+        if ($claimedOrig > 0 && $claimedOrig < $realSize) {
+            // 声称的原图比实际内容还小 → 伪造，忽略
+            $claimedOrig = 0;
+        }
+        if ($claimedOrig > $maxSize * 2) {
+            // 声称原图超过限制 2 倍 → 视为伪造，忽略
+            $claimedOrig = 0;
+        }
+        $originalSize = $claimedOrig > 0 ? $claimedOrig : $realSize;
 
         $realMime = $this->detectMime($tmp, $content);
         if (!$this->isAllowedMime($realMime)) {
             return $this->fail('不允许的图片格式: ' . $realMime);
         }
 
-        $maxSize = (int)(config('upload.max_size') ?? 10 * 1024 * 1024);
-        if ($originalSize > $maxSize) {
+        // Phase 9.3: 大小限制基于实际收到的内容（realSize），而不是声称的原图大小
+        // 浏览器 double 模式：原图可能 > maxSize，但前端压缩后的 blob 可能 < maxSize
+        // 若限制原图大小会误拒本可通过的压缩上传
+        if ($realSize > $maxSize) {
             return $this->fail('文件大小超过限制 (max=' . round($maxSize / 1024 / 1024, 1) . 'MB)');
         }
 
@@ -60,7 +76,6 @@ class UploadService
             ];
         }
 
-        $isApiCompress = !empty($opts['_api_compress']);
         $qualityLevel = $opts['quality'] ?? 'balanced';
 
         // 从 Profile 拿参数（如果提供）
@@ -119,11 +134,11 @@ class UploadService
             : sprintf('%s/%s.%s', $prefix, $filename, $ext);
 
         $profileIsOriginal = !empty($opts['_compression_profile']) && $opts['_compression_profile']['code'] === 'original';
-        $isOriginal = ($opts['quality'] ?? '') === 'original' || $profileIsOriginal;
-        // 后台开启水印时强制走压缩分支（确保水印生效，方案 A）
-        if (!empty($opts['_force_watermark'])) {
-            $isOriginal = false;
-        }
+        // Phase 9.3: 浏览器已压缩（skip_compress=1）→ 跳过压缩分支
+        $skipByBrowser = !empty($opts['skip_compress']);
+        // 后台开启水印时：即使 skip_compress 也走 chain（但仅加水印，不缩放不降质）
+        $forceWatermark = !empty($opts['_force_watermark']);
+        $isOriginal = (($opts['quality'] ?? '') === 'original' || $profileIsOriginal || $skipByBrowser) && !$forceWatermark;
 
         if ($isOriginal) {
             $storedContent = $content;
@@ -134,22 +149,29 @@ class UploadService
             $finalSize = strlen($storedContent);
             $finalMime = $realMime;
             $finalExt = $imageInfo['extension'] ?: $ext;
-            $width = $origInfo['width'] ?? 0;
-            $height = $origInfo['height'] ?? 0;
-            $ratio = 1.0;
-            $compressor = 'original';
-            $compSource = 'none';
+            // 宽高优先用已成功的 imageInfo（$tempSrc 已确认可解析），
+            // origInfo 解析失败时兜底，避免 0×0
+            $width = ($origInfo['width'] ?? 0) > 0 ? (int)$origInfo['width'] : (int)($imageInfo['width'] ?? 0);
+            $height = ($origInfo['height'] ?? 0) > 0 ? (int)$origInfo['height'] : (int)($imageInfo['height'] ?? 0);
+            $ratio = $originalSize > 0 ? round($finalSize / $originalSize, 4) : 1.0;
+            // skip_compress（浏览器压缩）→ compressor 标 browser，source 标 browser
+            $compressor = $skipByBrowser ? 'browser' : 'original';
+            $compSource = $skipByBrowser ? 'browser' : 'none';
             $preserved = true;
             @unlink($tempSrc);
         } else {
             // ========== Phase 9.2：CompressionChain 统一入口 ==========
             $chain = new \App\Processors\CompressionChain();
-            $chainResult = $chain->process($tempSrc, $realMime, !empty($opts['_api_upload']) ? 'api-server' : 'browser', [
-                'max_width'       => $maxW,
-                'max_height'      => $maxH,
-                'quality'         => $quality,           // 默认（JPEG/WebP）
-                'jpeg_quality'    => (int)($profile['jpeg_quality'] ?? $quality),
-                'webp_quality'    => (int)($profile['webp_quality'] ?? $quality),
+            // Phase 9.3: 浏览器已压缩 + 仅需水印 → 不缩放（max_width=0），
+            // quality 用 85（视觉无损、避免 q92 膨胀），只重编码一次以应用水印
+            $chainMaxW = $skipByBrowser ? 0 : $maxW;
+            $chainQuality = $skipByBrowser ? 85 : $quality;
+            $chainResult = $chain->process($tempSrc, $realMime, !empty($opts['_api_compress']) ? 'api-server' : 'browser', [
+                'max_width'       => $chainMaxW,
+                'max_height'      => $skipByBrowser ? 0 : $maxH,
+                'quality'         => $chainQuality,           // 默认（JPEG/WebP）
+                'jpeg_quality'    => (int)($profile['jpeg_quality'] ?? $chainQuality),
+                'webp_quality'    => (int)($profile['webp_quality'] ?? $chainQuality),
                 'png_compression' => (int)($profile['png_compression'] ?? 6),
                 'png_quality_min' => (int)($profile['png_quality_min'] ?? 40),
                 'png_quality_max' => (int)($profile['png_quality_max'] ?? 80),
@@ -162,27 +184,47 @@ class UploadService
             // 上传方（browser）请求结束后 php-fpm 会自动清理 tempSrc，我们不能碰
 
             if (!$chainResult['success']) {
+                @unlink($tempSrc);
+                $chain->cleanup($chainResult['output_path'] ?? null);
                 return $this->fail('压缩失败: ' . ($chainResult['error'] ?? '未知错误'));
             }
 
             // 从 final 路径读回（chain 复制了 inputFile 到 tempIn，所有产物在 tempIn 命名空间）
             $storedContent = file_get_contents($chainResult['output_path']);
-            // 让 chain 清理临时文件（final 和 tempIn）
+            // 让 chain 清理临时文件（final 和 tempIn 和 .cmp）
             $chain->cleanup($chainResult['output_path']);
-            // 同时清理 .cmp 中间产物
-            if (!empty($chainResult['output_path'])) {
-                @unlink(str_replace('.final', '.cmp', $chainResult['output_path']));
-            }
+            // 清理自建输入副本（makeTempFile 产物 PHP 不会自动清理）
+            @unlink($tempSrc);
 
             $finalSize   = (int)($chainResult['size'] ?? 0);
             $finalMime   = $chainResult['mime'] ?? $realMime;
             $finalExt    = $chainResult['extension'] ?? $ext;
-            $width       = (int)($chainResult['width'] ?? 0);
-            $height      = (int)($chainResult['height'] ?? 0);
+            // 宽高：chain 未返回时（preserve 原图分支）用已成功的 $imageInfo 兜底，避免 0×0
+            $width       = (int)($chainResult['width'] ?? 0) > 0
+                ? (int)$chainResult['width']
+                : (int)($imageInfo['width'] ?? 0);
+            $height      = (int)($chainResult['height'] ?? 0) > 0
+                ? (int)$chainResult['height']
+                : (int)($imageInfo['height'] ?? 0);
             $ratio       = (float)($chainResult['compression_ratio'] ?? 1.0);
             $compressor  = $chainResult['compressor'] ?? 'original';
             $compSource  = $chainResult['compression_source'] ?? 'none';
             $preserved   = !empty($chainResult['preserved_original']);
+            // Phase 9.3: 浏览器链路（skip_compress 或 double 模式）语义修正
+            //  - skip_compress：最终文件是浏览器压缩结果 → 无条件标 browser
+            //  - double 后端压不动保留原 blob：同样是浏览器结果 → 标 browser
+            //  - double 后端真正压缩：保持 gd（compressor 指最终处理者）
+            // ratio 一律基于真实原图大小（final / 原图），而非上传 blob
+            $isBrowserChain = $skipByBrowser || ($originalSize > 0 && $originalSize !== $realSize);
+            if ($isBrowserChain) {
+                if ($skipByBrowser || $compressor === 'original' || $preserved) {
+                    $compressor = 'browser';
+                    $compSource = 'browser';
+                }
+                if ($originalSize > 0) {
+                    $ratio = round($finalSize / $originalSize, 4);
+                }
+            }
         }
 
         if ($storedContent === false) {

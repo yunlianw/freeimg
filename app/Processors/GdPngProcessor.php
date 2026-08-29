@@ -12,7 +12,7 @@ namespace App\Processors;
  * alpha 保留：GD palette 模式下 alpha 通道仍保留（PaletteAlpha）。
  *
  * 替代原 PngquantProcessor（php-fpm 禁用 exec()，无法调 pngquant CLI）。
- * 实测效果与 pngquant 几乎一致（典型 RGBA 截图：
+ * 实测效果与 pngquant 几乎一致（老季那张 699x445 RGBA 截图：
  *   原图 40591B → pngquant 18KB → GD palette 17KB）。
  *
  * 返回同 GdProcessor::compress() 格式：

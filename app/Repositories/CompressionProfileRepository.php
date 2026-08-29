@@ -71,7 +71,7 @@ class CompressionProfileRepository
             if ($p) return $p;
         }
 
-        // apiKey 关联 profile（如 PicGo 默认绑定 extreme）
+        // apiKey 关联 profile（如老季给 PicGo 绑 extreme）
         if ($apiKey && !empty($apiKey['compression_profile_id'])) {
             $p = $this->find((int)$apiKey['compression_profile_id']);
             if ($p) return $p;

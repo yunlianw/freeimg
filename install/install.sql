@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS `storages` (
   `priority` int(11) NOT NULL DEFAULT '0',
   `visible_in_upload` tinyint(1) NOT NULL DEFAULT '1',
   `max_capacity_mb` int(11) DEFAULT NULL,
-  `current_usage_mb` bigint(20) NOT NULL DEFAULT '0',
+  `current_usage_mb` decimal(12,4) NOT NULL DEFAULT '0.0000',
   PRIMARY KEY (`id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_driver` (`driver`),
