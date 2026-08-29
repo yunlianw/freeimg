@@ -1,0 +1,44 @@
+# 依赖
+/node_modules
+/vendor
+
+# 环境
+/.env
+/.env.local
+
+# 配置文件（实际值，含密码）
+/config/config.php
+
+# 锁文件
+/*.lock
+/.installed
+/install/install.lock
+
+# 存储
+/storage/images/
+/storage/cache/
+/storage/logs/
+
+# 后台日志
+*.log
+
+# 备份
+*.backup.*
+*.bak
+*.old
+*.tar.gz
+
+# 系统文件
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 上传
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# 临时文件
+/tmp/
