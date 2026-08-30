@@ -16,17 +16,14 @@
             <label>站点名称</label>
             <input type="text" name="site_name" value="<?= htmlspecialchars($settings['site_name'] ?? 'FreeImg') ?>">
         </div>
-        <div class="form-group">
-            <label>站点描述</label>
-            <input type="text" name="site_description" value="<?= htmlspecialchars($settings['site_description'] ?? '') ?>">
-        </div>
     </div>
 
     <div class="field-group">
         <div class="field-group-title">📤 上传设置</div>
         <div class="form-group">
             <label>最大文件大小 (MB)</label>
-            <input type="number" name="upload_max_size" min="1" max="100" value="<?= htmlspecialchars($settings['upload_max_size'] ?? '10') ?>">
+            <input type="number" name="upload_max_size" min="1" max="20" value="<?= htmlspecialchars($settings['upload_max_size'] ?? '10') ?>">
+            <div class="hint">受 nginx `client_max_body_size 20M` 限制，最大 20MB</div>
         </div>
         <div class="form-group">
             <label>允许的扩展名（逗号分隔）</label>
@@ -156,18 +153,6 @@
     <div class="field-group">
         <div class="field-group-title">💾 存储</div>
         <div class="form-group">
-            <label>默认存储驱动</label>
-            <select name="default_storage">
-                <option value="local" <?= ($settings['default_storage'] ?? '') === 'local' ? 'selected' : '' ?>>本地存储</option>
-                <option value="s3" <?= ($settings['default_storage'] ?? '') === 's3' ? 'selected' : '' ?>>S3 / Cloudflare R2</option>
-                <option value="cos" <?= ($settings['default_storage'] ?? '') === 'cos' ? 'selected' : '' ?>>腾讯云 COS</option>
-                <option value="oss" <?= ($settings['default_storage'] ?? '') === 'oss' ? 'selected' : '' ?>>阿里云 OSS</option>
-                <option value="obs" <?= ($settings['default_storage'] ?? '') === 'obs' ? 'selected' : '' ?>>华为云 OBS</option>
-                <option value="sftp" <?= ($settings['default_storage'] ?? '') === 'sftp' ? 'selected' : '' ?>>SFTP（其他服务器）</option>
-            </select>
-            <div class="hint">多云驱动将在 Phase 4-5 实现</div>
-        </div>
-        <div class="form-group">
             <label>URL 路径前缀</label>
             <input type="text" name="url_path_prefix" value="<?= htmlspecialchars($settings['url_path_prefix'] ?? 'rest/new') ?>" placeholder="rest/new">
             <div class="hint">
@@ -229,22 +214,6 @@
         <p style="color:var(--gray-600); font-size:13px; padding:8px 12px; background:var(--gray-50); border-radius:6px;">
             💡 会话超时、登录锁定、密码强度、2FA 颁发者 等安全策略已迁到 <a href="<?= base_url('security/policy') ?>" style="color:var(--primary); font-weight:600;">安全策略</a> 页面（仅管理员可见）。
         </p>
-    </div>
-
-    <div class="field-group">
-        <div class="field-group-title">🔒 权限</div>
-        <div class="form-group">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal;">
-                <input type="checkbox" name="allow_signup" value="1" <?= ($settings['allow_signup'] ?? '') === '1' ? 'checked' : '' ?>>
-                允许用户注册（多用户模式）
-            </label>
-        </div>
-        <div class="form-group">
-            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal;">
-                <input type="checkbox" name="maintenance_mode" value="1" <?= ($settings['maintenance_mode'] ?? '') === '1' ? 'checked' : '' ?>>
-                维护模式
-            </label>
-        </div>
     </div>
 
     <div class="form-actions">

@@ -41,4 +41,6 @@ Thumbs.db
 !/public/uploads/.gitkeep
 
 # 临时文件
-/tmp/
+/tmp/public/img/*
+
+# 兜底：禁止把生产图目录纳入版本控制（凌晨事故教训）

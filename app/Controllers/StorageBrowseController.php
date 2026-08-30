@@ -16,7 +16,12 @@ class StorageBrowseController
     {
         AuthMiddleware::handle();
         $user = AuthService::user();
+        // 安全：prefix 只允许字母/数字/斜杠/下划线/短横线，禁止 .. 路径穿越
         $prefix = trim((string)($_GET['prefix'] ?? ''), '/');
+        $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
+        if (str_contains($prefix, '..')) {
+            $prefix = '';
+        }
 
         // 默认驱动
         $rows = \App\Core\Db::fetchAll(
@@ -36,6 +41,15 @@ class StorageBrowseController
 
             // 拼上 prefix
             $scanPath = $prefix === '' ? $basePath : $basePath . '/' . $prefix;
+
+            // 安全：realpath 边界校验，确保 scanPath 仍在 basePath 之下
+            if ($prefix !== '') {
+                $realBase = realpath($basePath);
+                $realScan = realpath($scanPath);
+                if ($realBase === false || $realScan === false || strpos($realScan, $realBase . DIRECTORY_SEPARATOR) !== 0) {
+                    continue; // 越界访问 → 静默跳过
+                }
+            }
 
             if (!is_dir($scanPath)) continue;
 

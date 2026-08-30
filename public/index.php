@@ -52,6 +52,12 @@ if (!is_installed()) {
     // 时区
     date_default_timezone_set($config['app']['timezone'] ?? 'Asia/Shanghai');
 
+    // 安全响应头（PHP 层兜底，nginx/Apache 部署均生效）
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header("Content-Security-Policy: default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
+
     // 错误显示
     if (!empty($config['app']['debug'])) {
         error_reporting(E_ALL);

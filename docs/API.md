@@ -1,6 +1,6 @@
 # FreeImg REST API 文档
 
-适用版本：FreeImg v1.1.1-alpha+
+适用版本：FreeImg v1.1.3-alpha+
 
 ---
 
@@ -114,7 +114,7 @@ POST https://your-domain/api/v1/upload
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `file` 或 `image` 或 `files` | File | 是 | 图片文件（支持 JPG/PNG/GIF/WebP/BMP） |
-| `compression` | String | 否 | 覆盖默认压缩：`original` / `high` / `balanced` / `small` / `extreme` / `custom` |
+| `compression` | String | 否 | 覆盖默认压缩：`original` / `high` / `balanced` / `saver` / `extreme` |
 | `folder_id` | Integer | 否 | 目标文件夹 ID（先在 FreeImg 后台创建文件夹） |
 | `is_public` | 0 / 1 | 否 | 默认 1（公开直链） |
 
@@ -320,7 +320,7 @@ GET https://your-domain/api/v1/folders
 | `original` | 原图 | 不缩 | 不压 |
 | `high` | 高清 | 2048 | 85 |
 | `balanced` | 均衡 | 1600 | 70 |
-| `small` | 省流 | 1200 | 55 |
+| `saver` | 省流 | 1200 | 55 |
 | `extreme` | 极限省流 | 900 | 40 |
 
 ---
@@ -337,7 +337,7 @@ GET https://your-domain/api/v1/folders
 |---|---|
 | `API 地址` | `https://your-domain/api/v1/upload` |
 | `自定义请求头` | `Authorization: Bearer ACCESS_KEY:SECRET_KEY` |
-| `自定义 Body` | `{"compression":"small"}` |
+| `自定义 Body` | `{"compression":"saver"}` |
 | `文件路径字段名` | `file` |
 | `返回 JSON 中的图片 URL 字段路径` | `image.url` |
 
@@ -380,7 +380,7 @@ curl -s -X POST \
 
 ### 步骤
 
-1. **创建专用 Key**：在 FreeImg 后台 → API Key → 创建名为"帝国CMS" → 选压缩档（建议 `balanced` 或 `small`）→ 保存
+1. **创建专用 Key**：在 FreeImg 后台 → API Key → 创建名为"帝国CMS" → 选压缩档（建议 `balanced` 或 `saver`）→ 保存
 2. **帝国 CMS 插件**：
    - 后台 `e/admin/` 目录下新建插件
    - 改造编辑器"插入图片"按钮，弹窗显示：
@@ -480,7 +480,7 @@ curl -H "Authorization: Bearer fk_xxx:sk_xxx" \
 
 ## 十八、API 版本
 
-当前版本：`v1.1.1-alpha`
+当前版本：`v1.1.3-alpha`
 
 API 路径以 `/api/v1/` 为前缀。后续大版本（如 v2）会保留 v1 兼容至少 6 个月。
 

@@ -26,15 +26,14 @@ class SettingController
         }
 
         $allowed = [
-            'site_name', 'site_description',
+            'site_name',
             'upload_max_size', 'upload_allowed_types',
-            'default_storage', 'default_compression',
+            'default_compression',
             'url_path_prefix',
             // 重命名规则
             'rename_rule', 'rename_custom_format',
             // 目录规则
             'dir_rule', 'dir_custom_format',
-            'allow_signup', 'maintenance_mode',
             // 文字水印
             'watermark_enabled', 'watermark_text', 'watermark_font_size',
             'watermark_color', 'watermark_opacity', 'watermark_angle',

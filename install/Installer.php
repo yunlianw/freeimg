@@ -209,6 +209,12 @@ class Installer
     public function createLock(string $lockFile, int $adminId): void
     {
         file_put_contents($lockFile, date('Y-m-d H:i:s') . " | admin_id=$adminId\n");
+
+        // v1.1.4+: 触发升级脚本（清理孤儿 settings 行等）
+        $upgradeFile = __DIR__ . '/upgrade.php';
+        if (file_exists($upgradeFile)) {
+            require_once $upgradeFile;
+        }
     }
 
     /**

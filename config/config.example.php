@@ -39,6 +39,7 @@ return [
         'max_size'      => 10 * 1024 * 1024, // 10MB
         'allowed_types' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'],
         'chunk_size'    => 2 * 1024 * 1024,
+        'max_pixels'    => 16 * 1024 * 1024, // 像素炸弹防护：单图最大 16MP（宽×高）；128M memory_limit 下 GD 解码安全
     ],
 
     // 图片处理

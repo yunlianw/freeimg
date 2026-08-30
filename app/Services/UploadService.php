@@ -42,7 +42,9 @@ class UploadService
         }
         $realSize = strlen($content);
         $claimedOrig = !empty($opts['original_size']) ? (int)$opts['original_size'] : 0;
-        $maxSize = (int)(config('upload.max_size') ?? 10 * 1024 * 1024);
+        // 大小上限优先读后台"上传设置→最大文件大小"（MB），未配置时回落到 config.php
+        $maxSize = (int)(config('settings.upload_max_size') ?? 0);
+        $maxSize = $maxSize > 0 ? $maxSize * 1024 * 1024 : (int)(config('upload.max_size') ?? 10 * 1024 * 1024);
         if ($claimedOrig > 0 && $claimedOrig < $realSize) {
             // 声称的原图比实际内容还小 → 伪造，忽略
             $claimedOrig = 0;
@@ -55,7 +57,7 @@ class UploadService
 
         $realMime = $this->detectMime($tmp, $content);
         if (!$this->isAllowedMime($realMime)) {
-            return $this->fail('不允许的图片格式: ' . $realMime);
+            return $this->fail('不允许的图片格式: ' . $realMime . '（当前允许：' . $this->allowedTypesHint() . '）');
         }
 
         // Phase 9.3: 大小限制基于实际收到的内容（realSize），而不是声称的原图大小
@@ -76,7 +78,7 @@ class UploadService
             ];
         }
 
-        $qualityLevel = $opts['quality'] ?? 'balanced';
+        $qualityLevel = $opts['quality'] ?? (config('settings.default_compression') ?: 'balanced');
 
         // 从 Profile 拿参数（如果提供）
         if (!empty($opts['_compression_profile'])) {
@@ -105,6 +107,19 @@ class UploadService
         if (!$imageInfo) {
             @unlink($tempSrc);
             return $this->fail('无法解析图片信息');
+        }
+
+        // 安全：像素炸弹防护——超大尺寸图片会在 GD 解码时耗尽内存（DoS）
+        // getimagesize 只读头部，解码发生在压缩链中；这里先按宽高乘积拦截
+        // 默认 16MP：128M memory_limit 下 GD 解码临界安全（再大会 OOM）
+        // 用除法形式避免 $srcW*$srcH 溢出后转 float 的语义依赖
+        $maxPixels = (int)(config('upload.max_pixels') ?? 16 * 1024 * 1024);
+        if ($maxPixels <= 0) $maxPixels = 16 * 1024 * 1024; // 防止配错值导致所有图片被拒
+        $srcW = (int)($imageInfo['width'] ?? 0);
+        $srcH = (int)($imageInfo['height'] ?? 0);
+        if ($srcW > 0 && $srcH > 0 && $srcW > (int)($maxPixels / $srcH)) {
+            @unlink($tempSrc);
+            return $this->fail('图片尺寸过大（超过 ' . round($maxPixels / 1024 / 1024, 1) . 'MP 像素上限）');
         }
 
         $ext = $format ?: $imageInfo['extension'];
@@ -404,7 +419,32 @@ class UploadService
         foreach ($forbidden as $f) {
             if (str_contains($mime, $f)) return false;
         }
+        // 后台"上传设置→允许的文件类型"作为附加白名单（与硬性黑名单取交集，双向收紧）
+        $allowed = config('settings.upload_allowed_types');
+        if (!empty($allowed)) {
+            $extByMime = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp', 'image/bmp' => 'bmp'];
+            $ext = $extByMime[$mime] ?? null;
+            if ($ext === null) {
+                return false; // 不在白名单映射内的格式一律拒绝
+            }
+            $list = array_map('trim', explode(',', strtolower((string)$allowed)));
+            if (!in_array($ext, $list, true) && !in_array($mime === 'image/jpeg' ? 'jpeg' : $ext, $list, true)) {
+                return false;
+            }
+        }
         return true;
+    }
+
+    /**
+     * 上传白名单错误信息（供外部 catch 后格式化）
+     */
+    public function allowedTypesHint(): string
+    {
+        $allowed = config('settings.upload_allowed_types');
+        if (empty($allowed)) {
+            return 'jpg, jpeg, png, gif, webp, bmp';
+        }
+        return trim((string)$allowed);
     }
 
     private function sanitizeName(string $name): string

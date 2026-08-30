@@ -18,6 +18,39 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [1.1.4-alpha] - 2026-08-30
+
+Phase 9.4：6 项安全加固 + 文档准确性修正 + 升级清理。
+
+### 🐛 修复（龙虾二号审查 6 项 P2）
+
+#### 安全加固
+- **像素炸弹防护**（`UploadService.php`）：单图 > 16MP 拦截（128M 内存下 GD 安全解码上限）
+- **upload_max_size 走后端设置**（`UploadService.php`）：默认 10MB 可在后台"上传设置"调整
+- **default_compression 走后端设置**（`UploadService.php`）：上传默认压缩档与后台同步
+- **upload_allowed_types 白名单**（`UploadService.php`）：后台"允许的扩展名"作为附加白名单
+- **存储浏览路径穿越防护**（`StorageBrowseController.php`）：双重防护（preg_replace + realpath）
+- **安全响应头**（`public/index.php`）：CSP / X-Frame-Options / X-Content-Type-Options / Referrer-Policy
+
+#### 配置一致性
+- 同步 `config/config.example.php` 与线上 `config/config.php`：新增 `upload.max_pixels = 16MP`
+
+#### 表单 + nginx 一致性
+- `views/settings/index.php`：`upload_max_size` 输入 `max="20"`（与 nginx `client_max_body_size 20M` 对齐）
+
+#### 错误信息友好化
+- `UploadService::isAllowedMime` 拒绝时附带当前允许的扩展名列表
+
+#### 升级清理（`install/upgrade.php` 新增）
+- 安装完成自动清理孤儿 settings 行：`site_description` / `default_storage` / `allow_signup` / `maintenance_mode`（v1.1.3 删除但 DB 残留）
+
+### 📖 文档
+
+- README.md：表数 11 → 14、API Key 前缀 `ak_` → `fk_`、参数 `quality` → `compression`、`album_id` → `folder_id`
+- docs/API.md：版本号 v1.1.1 → v1.1.3、压缩档 `small` → `saver`
+
+---
+
 ## [1.1.3-alpha] - 2026-08-30
 
 Phase 9.3：浏览器上传压缩三模式 + 压缩系统缺陷修复 + 老季数据恢复。

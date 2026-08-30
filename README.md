@@ -429,7 +429,7 @@ http://img.yourdomain.com/install/
 |:---:|:---|:---|
 | 1️⃣ | 环境检测 | 自动检查 PHP 版本、扩展、目录权限 |
 | 2️⃣ | 数据库配置 | 填 DB 主机/库名/用户/密码（自动建库） |
-| 3️⃣ | 初始化 | 自动建表（11 张）+ 创建管理员账号 |
+| 3️⃣ | 初始化 | 自动建表（14 张）+ 创建管理员账号 |
 | 4️⃣ | 完成 | 生成 `config/config.php` 和 `install.lock` |
 
 ### 5️⃣ 安全收尾
@@ -498,11 +498,11 @@ cp /www/wwwroot/freeimg/config/config.php /backup/
 
 # 2. 上传图片
 curl -X POST https://img.yourdomain.com/api/v1/upload \
-  -H "X-API-Key: ak_xxxxxxxxxxxx" \
+  -H "X-API-Key: fk_xxxxxxxxxxxx" \
   -H "X-API-Secret: sk_xxxxxxxxxxxx" \
   -F "image=@/path/to/photo.jpg" \
-  -F "quality=balanced" \
-  -F "album_id=5"        # 可选：归入相册
+  -F "compression=balanced" \
+  -F "folder_id=5"        # 可选：归入相册（文件夹）
   -F "expires_at=2027-01-01"  # 可选：过期时间
 
 # 响应
@@ -517,7 +517,7 @@ curl -X POST https://img.yourdomain.com/api/v1/upload \
     "size": 102400,
     "width": 1920,
     "height": 1080,
-    "album_id": 5
+    "folder_id": 5
   }
 }
 ```
@@ -533,7 +533,7 @@ curl -X POST https://img.yourdomain.com/api/v1/upload \
         "name": "FreeImg",
         "url": "https://img.yourdomain.com",
         "headers": {
-          "X-API-Key": "ak_xxx",
+          "X-API-Key": "fk_xxx",
           "X-API-Secret": "sk_xxx"
         },
         "formDataName": "image",

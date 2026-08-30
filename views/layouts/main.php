@@ -9,7 +9,7 @@ $currentPath = $_SERVER['REQUEST_URI'] ?? '/';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= htmlspecialchars(($title ?? '控制台') . ' - FreeImg 自由图床') ?></title>
+<title><?= htmlspecialchars(($title ?? '控制台') . ' - ' . (config('settings.site_name') ?: 'FreeImg')) ?></title>
 <link rel="stylesheet" href="/assets/style.css?v=1787966089">
 </head>
 <body>
