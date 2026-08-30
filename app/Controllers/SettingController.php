@@ -29,6 +29,7 @@ class SettingController
             'site_name',
             'upload_max_size', 'upload_allowed_types',
             'default_compression',
+            'strip_exif',
             'url_path_prefix',
             // 重命名规则
             'rename_rule', 'rename_custom_format',

@@ -75,8 +75,9 @@ class CompressionChain
 
         $srcSize = filesize($inputFile);
 
-        // GIF：原样保留（不动图）
+        // GIF：原样保留（不动图，避免丢动画帧）
         // 注意：$inputFile 在 chain 同步调用期间始终有效（$_FILES 临时文件请求结束才清理）
+        // 除非 strip_exif 强制开启：GIF 没有标准 EXIF 段（只有 GIF 注释），重绘会丢动画，所以仍原样返回
         if ($realMime === 'image/gif') {
             return [
                 'success' => true,
@@ -123,6 +124,27 @@ class CompressionChain
             }
             if (empty($result['success'])) {
                 @unlink($tmpDest);
+                // P1-1 修复：strip_exif 开启时仍尝试 GD 重绘剥 EXIF（BMP 等未知 MIME 不能直接跳过）
+                if (!empty($opts['strip_exif'])) {
+                    $rw = $this->stripExifRewrite($tempIn, $realMime);
+                    if ($rw['success']) {
+                        $finalPath = $tempIn . '.final';
+                        @rename($rw['output_path'], $finalPath);
+                        return [
+                            'success' => true,
+                            'width'   => (int)($rw['width'] ?? 0),
+                            'height'  => (int)($rw['height'] ?? 0),
+                            'size'    => (int)($rw['size'] ?? 0),
+                            'mime'    => $realMime,
+                            'extension' => $this->mimeToExt($realMime),
+                            'compression_ratio' => $srcSize > 0 ? round((int)($rw['size'] ?? 0) / $srcSize, 4) : 1.0,
+                            'compressor' => 'gd-rewrite',
+                            'compression_source' => $source,
+                            'preserved_original' => false,
+                            'output_path' => $finalPath,
+                        ];
+                    }
+                }
                 return [
                     'success' => true,
                     'size'    => $srcSize,
@@ -138,8 +160,29 @@ class CompressionChain
         }
 
         // 处理器失败：原样保留
+        // 但如果 strip_exif 开启且该 MIME 支持 GD 重绘 → 仍尝试剥 EXIF
         if (empty($result['success'])) {
             @unlink($tmpDest);
+            if (!empty($opts['strip_exif']) && in_array($realMime, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true)) {
+                $rewriteResult = $this->stripExifRewrite($tempIn, $realMime);
+                if ($rewriteResult['success']) {
+                    $finalPath = $tempIn . '.final';
+                    @rename($rewriteResult['output_path'], $finalPath);
+                    return [
+                        'success' => true,
+                        'width'   => (int)($rewriteResult['width'] ?? 0),
+                        'height'  => (int)($rewriteResult['height'] ?? 0),
+                        'size'    => (int)($rewriteResult['size'] ?? 0),
+                        'mime'    => $realMime,
+                        'extension' => $this->mimeToExt($realMime),
+                        'compression_ratio' => $srcSize > 0 ? round((int)($rewriteResult['size'] ?? 0) / $srcSize, 4) : 1.0,
+                        'compressor' => 'gd-rewrite',
+                        'compression_source' => $source,
+                        'preserved_original' => false,
+                        'output_path' => $finalPath,
+                    ];
+                }
+            }
             return [
                 'success' => true,
                 'size'    => $srcSize,
@@ -155,10 +198,50 @@ class CompressionChain
 
         // 比大小：压缩后 >= 原图 → 保留原图
         // 例外：启用水印时不能保留原图（水印已画在 .cmp 上，保留原图=丢水印）
+        // 例外：strip_exif 开启时也不能保留原图（要过 GD 重绘剥离 EXIF）
         $cmpSize = (int)($result['size'] ?? 0);
         $hasWatermark = !empty($opts['watermark']) && is_array($opts['watermark']);
-        if ($cmpSize >= $srcSize && !$hasWatermark) {
+        $stripExif = !empty($opts['strip_exif']);
+        if ($cmpSize >= $srcSize && !$hasWatermark && !$stripExif) {
             @unlink($tmpDest);
+            return [
+                'success' => true,
+                'size'    => $srcSize,
+                'mime'    => $realMime,
+                'extension' => $this->mimeToExt($realMime),
+                'compression_ratio' => 1.0,
+                'compressor' => 'original',
+                'compression_source' => 'none',
+                'preserved_original' => true,
+                'output_path' => $tempIn,
+            ];
+        }
+
+        // strip_exif 开启但 GdProcessor 已被 strip_metadata 选项处理（产物在 tmpDest 已剥 EXIF），
+        // 此时正常走下方"移到 final"流程即可。
+        // strip_exif 兜底：若 GdProcessor 没产出文件（BMP/未知 MIME 走到 else 分支返回 preserved 时），
+        // chain 不会到这里；只有当 GdProcessor 真正失败但 strip_exif 又要剥时：
+        if ($stripExif && !file_exists($tmpDest)) {
+            $rewriteResult = $this->stripExifRewrite($tempIn, $realMime);
+            if ($rewriteResult['success']) {
+                // stripExifRewrite 写到 $tempIn.noexif，搬到 .final
+                $finalPath = $tempIn . '.final';
+                @rename($rewriteResult['output_path'], $finalPath);
+                return [
+                    'success' => true,
+                    'width'   => (int)($rewriteResult['width'] ?? 0),
+                    'height'  => (int)($rewriteResult['height'] ?? 0),
+                    'size'    => (int)($rewriteResult['size'] ?? 0),
+                    'mime'    => $realMime,
+                    'extension' => $this->mimeToExt($realMime),
+                    'compression_ratio' => $srcSize > 0 ? round((int)($rewriteResult['size'] ?? 0) / $srcSize, 4) : 1.0,
+                    'compressor' => 'gd-rewrite',
+                    'compression_source' => $source,
+                    'preserved_original' => false,
+                    'output_path' => $finalPath,
+                ];
+            }
+            // P1-3 修复：rewrite 失败时直接返回 preserved_original（不要继续走到下方 rename/copy 不存在的 $tmpDest）
             return [
                 'success' => true,
                 'size'    => $srcSize,
@@ -196,6 +279,73 @@ class CompressionChain
     }
 
     /**
+     * GD 重绘剥 EXIF（当链不压缩时仍要执行 strip_exif）
+     *
+     * 原理：imagecreatefrom* + image* 重绘只保留像素和必要的色彩信息，
+     * 不会写入 EXIF/IPTC/XMP 等元数据段。
+     *
+     * 注意：PNG 透明通道会保留（imagecreatefrompng 解析 alpha 通道）；
+     *      BMP 没有标准 EXIF 段，重绘基本无变化但仍走一遍。
+     *
+     * @return array{success:bool, width?:int, height?:int, size?:int, output_path?:string, error?:string}
+     */
+    public function stripExifRewritePublic(string $inputFile, string $mime): array
+    {
+        return $this->stripExifRewrite($inputFile, $mime);
+    }
+
+    private function stripExifRewrite(string $inputFile, string $mime): array
+    {
+        $img = null;
+        switch ($mime) {
+            case 'image/jpeg': $img = @imagecreatefromjpeg($inputFile); break;
+            case 'image/png':  $img = @imagecreatefrompng($inputFile);
+                if ($img !== false && $img !== null) {
+                    // PNG 透明支持
+                    imagealphablending($img, false);
+                    imagesavealpha($img, true);
+                }
+                break;
+            case 'image/webp': $img = function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($inputFile) : false;
+            if ($img !== false && $img !== null) {
+                imagealphablending($img, false);
+                imagesavealpha($img, true);
+            }
+            break;
+            case 'image/bmp':  $img = function_exists('imagecreatefrombmp') ? @imagecreatefrombmp($inputFile) : false; break;
+        }
+        if ($img === false || $img === null) {
+            return ['success' => false, 'error' => 'GD decode failed'];
+        }
+
+        $w = imagesx($img);
+        $h = imagesy($img);
+
+        // 写到新文件（不覆盖原 tempIn，避免污染）
+        $newPath = $inputFile . '.noexif';
+        $ok = false;
+        switch ($mime) {
+            case 'image/jpeg': $ok = imagejpeg($img, $newPath, 92); break;
+            case 'image/png':  $ok = imagepng($img, $newPath, 6); break;
+            case 'image/webp': $ok = function_exists('imagewebp') ? imagewebp($img, $newPath, 85) : imagejpeg($img, $newPath, 92); break;
+            case 'image/bmp':  $ok = function_exists('imagebmp') ? imagebmp($img, $newPath) : imagejpeg($img, preg_replace('/\.bmp$/i', '.jpg', $newPath), 92); break;
+        }
+        // PHP 8.0+ GD 资源自动释放，无需 imagedestroy
+
+        if (!$ok) {
+            return ['success' => false, 'error' => 'GD encode failed'];
+        }
+
+        return [
+            'success' => true,
+            'width'   => $w,
+            'height'  => $h,
+            'size'    => filesize($newPath),
+            'output_path' => $newPath,
+        ];
+    }
+
+    /**
      * 清理 chain 临时文件（在 caller 读完 output_path 后调用）
      * @param string|null $outputPath
      */
@@ -215,6 +365,11 @@ class CompressionChain
         $cmp = $tempIn . '.cmp';
         if (file_exists($cmp)) {
             @unlink($cmp);
+        }
+        // 删 .noexif 兜底产物（rename 失败时可能残留）
+        $noExif = $tempIn . '.noexif';
+        if (file_exists($noExif)) {
+            @unlink($noExif);
         }
     }
 

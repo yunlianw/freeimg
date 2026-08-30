@@ -174,6 +174,24 @@ class UploadService
             $compSource = $skipByBrowser ? 'browser' : 'none';
             $preserved = true;
             @unlink($tempSrc);
+            // P1-2 修复：原图模式（不压缩、不走 chain）下，若 strip_exif 开启，
+            // 对 JPEG/PNG/WebP/BMP 仍做 GD 重绘剥 EXIF，防止 GPS/设备信息泄露。
+            // GIF 因有动画帧不在此剥。代价：原图模式文件会重编码（无损几乎无视觉差异）。
+            $stripExifOn = (int)(config('settings.strip_exif') ?? 1) === 1;
+            if ($stripExifOn && in_array($realMime, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true)) {
+                $tmpNoExif = $this->makeTempFile($storedContent, $realMime);
+                $rwChain = new \App\Processors\CompressionChain();
+                $rwResult = $rwChain->stripExifRewritePublic($tmpNoExif, $realMime);
+                @unlink($tmpNoExif);
+                if ($rwResult['success']) {
+                    $storedContent = file_get_contents($rwResult['output_path']);
+                    @unlink($rwResult['output_path']);
+                    $finalSize = strlen($storedContent);
+                    $ratio = $originalSize > 0 ? round($finalSize / $originalSize, 4) : 1.0;
+                    $compressor = 'gd-rewrite';
+                    $compSource = $skipByBrowser ? 'browser' : 'api-server';
+                }
+            }
         } else {
             // ========== Phase 9.2：CompressionChain 统一入口 ==========
             $chain = new \App\Processors\CompressionChain();
@@ -192,7 +210,9 @@ class UploadService
                 'png_quality_max' => (int)($profile['png_quality_max'] ?? 80),
                 'min_quality'     => (int)($profile['minimum_quality'] ?? 30),
                 'target_size_kb' => (int)($profile['target_size_kb'] ?? 0),
-                'strip_metadata'  => (int)($profile['strip_metadata'] ?? 1),
+                // strip_metadata 已废弃：GD 重编码本身就不写 EXIF/IPTC/XMP（GdProcessor 删了死代码）。
+                // 用 strip_exif（chain 层）统一控制剥 EXIF。
+                'strip_exif'      => (int)(config('settings.strip_exif') ?? 1),
                 'watermark'       => WatermarkConfigResolver::resolve(),
             ]);
             // 重要：不要在这里 unlink($tempSrc)！chain 复制了 tempSrc 到自己的 tempIn 工作目录

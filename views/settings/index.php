@@ -40,6 +40,13 @@
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="form-group">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal;">
+                <input type="checkbox" name="strip_exif" value="1" <?= ($settings['strip_exif'] ?? '1') === '1' ? 'checked' : '' ?>>
+                上传时自动剥离 EXIF 元数据（默认开启，防止 GPS / 拍摄设备信息泄露）
+            </label>
+            <div class="hint">JPEG / PNG / WebP / BMP 会通过 GD 重绘剥离 EXIF/IPTC/XMP。GIF 有动画帧，不参与剥离。</div>
+        </div>
     </div>
 
     <div class="field-group">

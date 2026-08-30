@@ -98,14 +98,13 @@ class Installer
     {
         $defaults = [
             ['site_name', 'FreeImg 自由图床', 'general'],
-            ['site_description', '轻量级个人图床', 'general'],
             ['upload_max_size', '10', 'upload'],
             ['upload_allowed_types', 'jpg,jpeg,png,gif,webp,bmp', 'upload'],
             ['default_compression', 'balanced', 'image'],
-            ['allow_signup', '0', 'auth'],
-            ['maintenance_mode', '0', 'general'],
             // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
             ['browser_upload_mode', 'browser', 'image'],
+            // Phase 9.5: 隐私安全 - 默认开启 EXIF/IPTC/XMP 剥离（手机拍图含 GPS）
+            ['strip_exif', '1', 'image'],
         ];
         $stmt = $this->pdo->prepare("INSERT IGNORE INTO settings (`key`, `value`, `group`, created_at) VALUES (?, ?, ?, NOW())");
         foreach ($defaults as $s) {

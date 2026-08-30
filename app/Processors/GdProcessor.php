@@ -88,10 +88,10 @@ class GdProcessor implements ImageProcessorInterface
         $mime = $this->mimeFromExt($ext);
         $quality = max(1, min(100, (int)($opts['quality'] ?? 85)));
         $minQuality = max(1, min(100, (int)($opts['min_quality'] ?? 40)));
-        $stripMeta = !empty($opts['strip_metadata']);
 
         // 6. 计算输出尺寸（实际二进制）
         // 写到临时文件后读 size，再决定要不要删
+        // 注：GD 重编码本身就不写 EXIF/IPTC/XMP；strip_metadata 是死代码已删除。
         $tmpDest = $this->makeTemp($dest);
         $result = $this->saveImage($dstImg, $tmpDest, $mime, $quality);
         if (!$result) {
