@@ -90,6 +90,7 @@ window.FREEIMG_BASE = "<?= htmlspecialchars(rtrim(base_url(), '/')) ?>";
     var overlay = document.getElementById('drawer-overlay');
     var closeBtn = document.getElementById('drawer-close');
     if (!btn || !drawer || !overlay || !closeBtn) return;
+
     function openDrawer() {
         drawer.classList.add('open');
         overlay.classList.add('open');
@@ -104,10 +105,21 @@ window.FREEIMG_BASE = "<?= htmlspecialchars(rtrim(base_url(), '/')) ?>";
         drawer.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
     }
-    btn.addEventListener('click', openDrawer);
+    function toggleDrawer() {
+        if (drawer.classList.contains('open')) {
+            closeDrawer();
+        } else {
+            openDrawer();
+        }
+    }
+
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleDrawer();
+    });
     closeBtn.addEventListener('click', closeDrawer);
     overlay.addEventListener('click', closeDrawer);
-    // ESC 关闭
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
     });

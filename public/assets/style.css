@@ -1207,35 +1207,42 @@ a:hover { color: var(--primary-dark); }
 
 /* ===== 移动端侧边抽屉（PC 默认隐藏） ===== */
 .mobile-drawer-overlay {
-    display: none;
+    display: block;
     position: fixed;
-    inset: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     z-index: 999;
     opacity: 0;
-    transition: opacity 0.25s;
+    visibility: hidden;
+    pointer-events: none;  /* 关键：关闭时遮罩绝不拦截任何点击（根因：旧版 opacity:0 的透明遮罩整屏盖在汉堡按钮上方，吞掉所有点击） */
+    transition: opacity 0.25s, visibility 0s linear 0.25s;
 }
 .mobile-drawer-overlay.open {
     opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.25s, visibility 0s linear 0s;
 }
 .mobile-drawer {
     display: none;
     position: fixed;
     top: 0;
-    left: 0;
-    bottom: 0;
+    left: -100%;
     width: 280px;
     max-width: 80vw;
+    bottom: 0;
     background: var(--bg-card, #fff);
     z-index: 1000;
-    transform: translateX(-100%);
-    transition: transform 0.25s ease-out;
     flex-direction: column;
     box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
     overflow-y: auto;
+    visibility: hidden;
+    transition: left 0.25s ease-out, visibility 0s linear 0.25s;
 }
 .mobile-drawer.open {
-    transform: translateX(0);
+    left: 0;
+    visibility: visible;
+    transition: left 0.25s ease-out, visibility 0s linear 0s;
 }
 .drawer-header {
     display: flex;
@@ -1307,7 +1314,7 @@ a:hover { color: var(--primary-dark); }
     .user-name { display: none; }
     .user-menu .btn-link,
     .user-menu .user-logout-form { display: none; } /* 退出移到抽屉里 */
-    .mobile-drawer, .mobile-drawer-overlay { display: flex; }
+    .mobile-drawer { display: flex; } /* 遮罩不进 media：基础态 display:block + visibility:hidden + pointer-events:none，关闭时永不显示、永不拦截点击 */
     .topbar-inner { padding: 0 20px; }
 }
 
