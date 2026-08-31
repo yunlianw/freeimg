@@ -130,17 +130,23 @@ class AlbumController
     {
         AuthMiddleware::handle();
         $user = AuthService::user();
-        if (!csrf_check($request->post('csrf_token', ''))) {
-            flash('error', '会话已过期');
+
+        $isAjax = self::isJsonRequest($request);
+        $fail = function (string $msg) use ($isAjax) {
+            if ($isAjax) Response::json(['success' => false, 'message' => $msg], 400);
+            flash('error', $msg);
             Response::redirect(base_url('albums'));
+        };
+
+        if (!csrf_check($request->post('csrf_token', ''))) {
+            $fail('会话已过期，请刷新页面');
         }
 
         $id = (int)($params['id'] ?? 0);
         $repo = new FolderRepository();
         $folder = $repo->find($id);
         if (!$folder || (int)$folder['user_id'] !== (int)$user['id']) {
-            flash('error', '相册不存在或无权操作');
-            Response::redirect(base_url('albums'));
+            $fail('相册不存在或无权操作');
         }
 
         $token = (string)$folder['share_token'];
@@ -155,15 +161,12 @@ class AlbumController
         $expires = trim((string)$request->post('expires', ''));
         $allowed = [0, 1, 7, 30];
         $expiresAt = null;
+        $days = 0;
         if ($expires !== '') {
-            // 严格数字校验：拒绝 "abc"（(int) 会宽松转成 0）、"7abc" 等
             if (!ctype_digit($expires) || !in_array((int)$expires, $allowed, true)) {
-                flash('error', '有效期选项无效');
-                Response::redirect(base_url('albums'));
+                $fail('有效期选项无效');
             }
             $days = (int)$expires;
-        } else {
-            $days = 0;
         }
         if ($days > 0) {
             $expiresAt = date('Y-m-d H:i:s', strtotime("+{$days} days"));
@@ -172,19 +175,47 @@ class AlbumController
         // 密码：留空 = 保留原密码；显式勾选 clear_password 才清除
         $password = trim((string)$request->post('password', ''));
         $passwordHash = (string)$folder['share_password'] !== '' ? $folder['share_password'] : null;
-        if ($request->post('clear_password') !== null) {
+        $clearPw = $request->post('clear_password') !== null;
+        if ($clearPw) {
             $passwordHash = null;
         } elseif ($password !== '') {
             if (strlen($password) < 6 || strlen($password) > 64) {
-                flash('error', '访问密码需 6-64 字符');
-                Response::redirect(base_url('albums'));
+                $fail('访问密码需 6-64 字符');
             }
             $passwordHash = password_hash($password, PASSWORD_BCRYPT);
         }
 
-        $repo->setShare($id, $token, $expiresAt, $passwordHash);
-        flash('success', '分享已开启：' . base_url('s/' . $token));
+        try {
+            $repo->setShare($id, $token, $expiresAt, $passwordHash);
+        } catch (\Throwable $e) {
+            error_log('[AlbumController::share] DB error: ' . $e->getMessage());
+            $fail('保存分享失败，请重试');
+        }
+
+        $shareUrl = base_url('s/' . $token);
+        if ($isAjax) {
+            Response::json([
+                'success'    => true,
+                'message'    => '分享已开启',
+                'share_url'  => $shareUrl,
+                'token'      => $token,
+                'expires_at' => $expiresAt,
+                'has_password'=> $passwordHash !== null,
+            ]);
+        }
+        flash('success', '分享已开启：' . $shareUrl);
         Response::redirect(base_url('albums'));
+    }
+
+    /**
+     * 是否 JSON 请求（前端 fetch）
+     */
+    private static function isJsonRequest(Request $request): bool
+    {
+        if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') return true;
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+        if (stripos($accept, 'application/json') !== false) return true;
+        return false;
     }
 
     /** 关闭分享 */

@@ -106,9 +106,11 @@ class CompressionChain
 
         // 选处理器
         // 水印开启时：PNG 也必须走 GdProcessor（GdPngProcessor 不画水印）
+        // output_format=webp/jpg 时：PNG 也要走 GdProcessor 才能切换输出格式（GdPngProcessor 只产 PNG）
         $hasWatermark = !empty($opts['watermark']) && is_array($opts['watermark']);
+        $needsFormatSwitch = !empty($opts['output_format']) && $opts['output_format'] !== 'auto' && $opts['output_format'] !== 'png';
         if ($realMime === 'image/png') {
-            $result = $hasWatermark
+            $result = ($hasWatermark || $needsFormatSwitch)
                 ? $this->gd->compress($tempIn, $tmpDest, $opts)
                 : $this->pngquant->compress($tempIn, $tmpDest, $opts);
         } elseif ($realMime === 'image/jpeg') {
@@ -198,12 +200,35 @@ class CompressionChain
 
         // 比大小：压缩后 >= 原图 → 保留原图
         // 例外：启用水印时不能保留原图（水印已画在 .cmp 上，保留原图=丢水印）
-        // 例外：strip_exif 开启时也不能保留原图（要过 GD 重绘剥离 EXIF）
+        // strip_exif 不影响大小判断：保留原图 = EXIF 自然不会泄露（用户上传时 EXIF 本就保留在原图副本路径里）
         $cmpSize = (int)($result['size'] ?? 0);
         $hasWatermark = !empty($opts['watermark']) && is_array($opts['watermark']);
         $stripExif = !empty($opts['strip_exif']);
-        if ($cmpSize >= $srcSize && !$hasWatermark && !$stripExif) {
+        if ($cmpSize >= $srcSize && !$hasWatermark) {
             @unlink($tmpDest);
+            // P0 安全修复：保留原图前若 strip_exif 开启 → 必须先剥 EXIF（GPS/设备信息会泄露）
+            if ($stripExif && in_array($realMime, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true)) {
+                $rw = $this->stripExifRewrite($tempIn, $realMime);
+                if ($rw['success']) {
+                    $finalPath = $tempIn . '.final';
+                    @rename($rw['output_path'], $finalPath);
+                    return [
+                        'success' => true,
+                        'width'   => (int)($rw['width'] ?? 0),
+                        'height'  => (int)($rw['height'] ?? 0),
+                        'size'    => (int)($rw['size'] ?? 0),
+                        'mime'    => $realMime,
+                        'extension' => $this->mimeToExt($realMime),
+                        'compression_ratio' => $srcSize > 0 ? round((int)($rw['size'] ?? 0) / $srcSize, 4) : 1.0,
+                        'compressor' => 'gd-rewrite',
+                        'compression_source' => $source,
+                        'preserved_original' => false, // 已重绘剥 EXIF，不是原图
+                        'output_path' => $finalPath,
+                    ];
+                }
+                // stripExifRewrite 失败 → 兜底：拒绝保留带 EXIF 的原图（安全优先于可用性）
+                return ['success' => false, 'error' => 'strip_exif 开启但重绘失败，拒绝保留含 EXIF 的原图'];
+            }
             return [
                 'success' => true,
                 'size'    => $srcSize,

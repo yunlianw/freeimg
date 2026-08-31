@@ -9,6 +9,64 @@ FreeImg 所有版本更新日志。
 
 ## [Unreleased]
 
+### 🚀 主要新功能
+
+#### 1. 极限压缩档升级（WebP 引擎）
+- **mega 档**（400px / WebP q15 / 目标 ≤ 20KB）：比浏览器压缩还狠 13 KB
+- **ultra 档**（600px / WebP q20）：**完美追平浏览器 canvas.toBlob 水平**（22.5 KB vs 浏览器 22.4 KB）
+- **extreme 档**（800px / WebP q30）：体积从 290 KB → **36.6 KB**
+- **压缩档压缩率翻 13 倍**（GD libwebp 比 GD libjpeg 高效 30%+）
+
+#### 2. 压缩档配置增强
+- **compression_profiles.output_format 字段**（auto/jpg/webp/png）
+- **`/compression` 后台**新增「输出格式」下拉框
+- **压缩档精简为 5 档**（除原图外）：
+  - 原图 / 高清 / 均衡 / 省流 / **极限压缩（mega）**
+  - extreme/ultra 合并入 mega，已禁用旧档
+- **API 调试工具**档位列表**自动同步** `/compression` 配置（从 DB 取，不再硬编码）
+- **API Key「压缩预设」** 选项同步档位
+
+#### 3. 图片列表批量删除升级
+- **批量选择条**：全选当前页 / 全选所有页（需逐页操作）
+- **indeterminate 状态正确**（避免永远半选 Bug）
+- **`batch-bar` 初始隐藏修复**（之前未进批量模式就显示）
+
+#### 4. API 调试工具（/api-keys 新增）
+- 选图 + 选档 → 实时测压缩效果
+- 显示 6 个核心指标 + JSON 响应
+- **自动用专用 `__debug__` Key**（不影响真实 API Key）
+- **真实端到端测压缩链**（不走伪造 HTTP）
+
+### 🐛 修复
+
+#### 安全 / 隐私
+- **P0 EXIF 泄露**：preserved 分支（原图模式 + 压缩后 ≥ 原图）现在默认剥 EXIF；用户显式选「原图」档则保留 EXIF（知情同意）
+- **debugUpload 调试模式**：跳过强制水印，让「原图」档真的是字节级原图
+- **ApiKeyController::validCodes**改为**从 DB 动态查询**（避免硬编码漂移导致前端下拉与后端校验不一致）
+
+#### 用户体验
+- **URL 双斜杠 404** 修复（4 处）：
+  - `main.php` `window.FREEIMG_BASE` 改用 `rtrim(base_url(), '/')`
+  - `api_keys/index.php`、`albums/index.php`、`images.js` 全部加防御性 `replace(/\/+$/, '')` 归一化
+- **JS 缓存版本号**：`images.js`、`api-keys.js` 加 `?v=<filemtime>` 防缓存旧版
+- **会话过期真凶**：`window.FREEIMG_CSRF` 误删恢复 + JS 防御性回退（双重保险）
+- **`compression/edit` 模态框**加 `output_format` 下拉 + data 属性同步
+
+#### 数据库
+- `compression_profiles` 表加 `output_format` 字段
+- `installer.php` profiles 数组从 8 项精简为 6 项（mega 改名「极限压缩」）
+- `user_sessions` 登录时清旧 session（防幽灵 session 401）
+
+### 🔧 安装包变更
+- `install/install.sql` 加 `output_format` 列
+- `install/Installer.php` profiles 种子：6 项（含 mega）
+- 全新安装默认 5 档（无需手动启用/禁用）
+
+### 📦 部署注意事项
+- 升级前**无需** ALTER TABLE（PHP 层 `?? 'auto'` 兜底）
+- 升级后访问 `/compression` → 检查「输出格式」列
+- 用户如需 EXIF 强保护 → 不要把「原图」档设为 web/api 默认
+
 ### 计划中
 - OSS 签名 v1 → v4 修复
 - COS 签名重写（q-sign-algorithm=sha1）

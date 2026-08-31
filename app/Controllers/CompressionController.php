@@ -9,7 +9,8 @@ use App\Repositories\CompressionProfileRepository;
 /**
  * 压缩配置管理（picx 对标）
  *
- * 内置预设（is_builtin=1）只读，仅可切换启用；
+ * 内置预设（is_builtin=1）启用中只读，仅可切换启用；
+ * 已禁用的内置档可编辑/删除（清理用）；
  * 自定义预设（is_builtin=0）可编辑/删除；
  * web/API 默认档位存 settings 键。
  */
@@ -83,8 +84,9 @@ class CompressionController
             flash('error', '预设不存在');
             Response::redirect(base_url('compression'));
         }
-        if ($row['is_builtin']) {
-            flash('error', '内置预设不可编辑');
+        // 已禁用的内置档允许编辑（清理用）
+        if ($row['is_builtin'] && $row['enabled']) {
+            flash('error', '启用的内置预设不可编辑（请先禁用）');
             Response::redirect(base_url('compression'));
         }
 
@@ -142,8 +144,14 @@ class CompressionController
 
         $id = (int)$request->post('id', 0);
         $row = $this->profiles->find($id);
-        if (!$row || $row['is_builtin']) {
-            flash('error', '内置预设不可删除');
+        if (!$row) {
+            flash('error', '预设不存在');
+            Response::redirect(base_url('compression'));
+        }
+        // 已禁用的预设可以删除（反正没人用）
+        // 启用的内置档不可删（用户怕误删）
+        if ($row['is_builtin'] && $row['enabled']) {
+            flash('error', '启用的内置预设不可删除（请先禁用）');
             Response::redirect(base_url('compression'));
         }
 
@@ -155,8 +163,13 @@ class CompressionController
             Response::redirect(base_url('compression'));
         }
 
-        $this->profiles->delete($id);
-        flash('success', '预设已删除');
+        $deleted = $this->profiles->delete($id);
+        if ($deleted > 0) {
+            flash('success', '预设已删除');
+        } else {
+            // P2 修复：删除失败（被拦截或行不存在）→ 提示明确错误，不误导用户
+            flash('error', '预设删除失败：可能被引用或权限不足');
+        }
         Response::redirect(base_url('compression'));
     }
 
@@ -176,13 +189,27 @@ class CompressionController
             $browserMode = 'browser';
         }
 
-        if ($webId && !$this->profiles->find($webId)) {
-            flash('error', 'Web 默认档位不存在');
-            Response::redirect(base_url('compression'));
+        if ($webId) {
+            $webRow = $this->profiles->find($webId);
+            if (!$webRow) {
+                flash('error', 'Web 默认档位不存在');
+                Response::redirect(base_url('compression'));
+            }
+            if (!$webRow['enabled']) {
+                flash('error', 'Web 默认档位已禁用，请选启用档');
+                Response::redirect(base_url('compression'));
+            }
         }
-        if ($apiId && !$this->profiles->find($apiId)) {
-            flash('error', 'API 默认档位不存在');
-            Response::redirect(base_url('compression'));
+        if ($apiId) {
+            $apiRow = $this->profiles->find($apiId);
+            if (!$apiRow) {
+                flash('error', 'API 默认档位不存在');
+                Response::redirect(base_url('compression'));
+            }
+            if (!$apiRow['enabled']) {
+                flash('error', 'API 默认档位已禁用，请选启用档');
+                Response::redirect(base_url('compression'));
+            }
         }
 
         $this->setSetting('web_compression_profile_id', $webId);
@@ -195,6 +222,8 @@ class CompressionController
     /** 收集表单参数并收敛范围 */
     private function collect(Request $request): array
     {
+        $format = (string)$request->post('output_format', 'auto');
+        if (!in_array($format, ['auto', 'jpg', 'webp', 'png'], true)) $format = 'auto';
         return [
             'description'     => mb_substr(trim((string)$request->post('description', '')), 0, 255, 'UTF-8'),
             'max_dimension'   => max(100, min(10000, (int)$request->post('max_dimension', 1600))),
@@ -205,6 +234,7 @@ class CompressionController
             'minimum_quality' => max(1, min(100, (int)$request->post('minimum_quality', 40))),
             'strip_metadata'  => $request->post('strip_metadata') === '1' ? 1 : 0,
             'sort_order'      => max(0, min(9999, (int)$request->post('sort_order', 0))),
+            'output_format'   => $format,
         ];
     }
 

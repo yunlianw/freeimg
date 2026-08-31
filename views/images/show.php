@@ -103,4 +103,4 @@ window.FREEIMG_CSRF = "<?= htmlspecialchars($csrf) ?>";
 window.FREEIMG_BASE = "<?= base_url() ?>";
 window.FREEIMG_ID = <?= (int)$image['id'] ?>;
 </script>
-<script src="/assets/images.js"></script>
+<script src="/assets/images.js?v=<?= @filemtime(FREEIMG_ROOT . '/public/assets/images.js') ?: time() ?>"></script>

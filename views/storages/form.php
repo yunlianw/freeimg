@@ -187,7 +187,11 @@ document.getElementById('btn-test')?.addEventListener('click', function () {
     // 去掉必填校验，测试时允许空
     fd.delete('name');
 
-    fetch('<?= base_url('storages/test') ?>', { method: 'POST', body: fd })
+    fetch('<?= base_url('storages/test') ?>', {
+        method: 'POST',
+        body: fd,
+        headers: { 'Accept': 'application/json' },
+    })
         .then(r => r.json())
         .then(data => {
             const span = document.createElement('span');

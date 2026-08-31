@@ -178,6 +178,10 @@ class AuthController
      */
     private function completeLogin(array $user, string $ip, ?string $ua): void
     {
+        // 清掉该用户的所有旧 DB session，避免幽灵 session（用户多端/重复登录后，
+        // 早期 PHPSESSID 仍指向 user_sessions 里旧记录，但 $_SESSION['user_id'] 已更新——
+        // 旧 cookie 触发 AuthMiddleware::findValid() 会拿到别人或过期 token 导致 401）
+        SessionService::destroyAllForUser((int)$user['id']);
         $sessionToken = SessionService::create((int)$user['id'], $ip, $ua);
         // 关键：session_regenerate_id 防止 session fixation 攻击 + 让浏览器拿到新 PHPSESSID cookie
         session_regenerate_id(true);

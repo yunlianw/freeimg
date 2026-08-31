@@ -214,8 +214,9 @@ class StorageManager
             case 's3':
             case 'r2':
             case 'minio':
-            case 'obs':
                 return new S3Storage($cfg);
+            case 'obs':
+                return new ObsStorage($cfg);
             case 'cos':
                 return new CosStorage($cfg);
             case 'oss':
@@ -231,12 +232,112 @@ class StorageManager
     {
         try {
             $instance = self::buildFromConfig($driver, $cfg);
-            $ok = $instance->testConnection();
-            return $ok
-                ? ['ok' => true, 'message' => '✅ 连接成功']
-                : ['ok' => false, 'message' => '❌ 连接失败：请检查配置（地址/端口/账号/密钥）'];
+            $result = self::probeConfig($driver, $instance);
+            return $result;
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => '❌ ' . $e->getMessage()];
         }
+    }
+
+    /**
+     * 真实探测驱动：返回精确诊断
+     * 优先用测试文件上传再删除，避免和 ListBucket 等无关 ACL 冲突
+     */
+    private static function probeConfig(string $driver, $instance): array
+    {
+        // 用一个 probe 测试：上传→读取→删除
+        $probeKey = 'freeimg-probe-' . substr(md5(uniqid('', true)), 0, 8) . '.txt';
+        $probeContent = 'freeimg-probe-' . time();
+
+        try {
+            // 1) 探测桶存在（testConnection 走 HEAD 根，多数驱动都是 GET 探测，绕开 ListBucket 限制）
+            $connectOk = $instance->testConnection();
+            if (!$connectOk) {
+                return [
+                    'ok' => false,
+                    'message' => self::diagnose($driver, 'connect_fail', ''),
+                ];
+            }
+
+            // 2) 真实上传（验证 PutObject 权限）
+            $putOk = $instance->put($probeKey, $probeContent);
+            if (!$putOk) {
+                return [
+                    'ok' => false,
+                    'message' => self::diagnose($driver, 'put_fail', ''),
+                ];
+            }
+
+            // 3) 读取验证
+            $got = $instance->get($probeKey);
+            if ($got === null || $got !== $probeContent) {
+                $instance->delete($probeKey);
+                return [
+                    'ok' => false,
+                    'message' => self::diagnose($driver, 'get_fail', ''),
+                ];
+            }
+
+            // 4) 清理
+            $instance->delete($probeKey);
+
+            return ['ok' => true, 'message' => '✅ 连接成功（已验证上传/读取/删除）'];
+        } catch (\Throwable $e) {
+            // 兜底：捕获驱动内部异常
+            try { $instance->delete($probeKey); } catch (\Throwable $ignored) {}
+            return ['ok' => false, 'message' => '❌ ' . self::diagnose($driver, 'exception', $e->getMessage())];
+        }
+    }
+
+    /**
+     * 根据驱动 + 失败阶段给出精确诊断
+     */
+    private static function diagnose(string $driver, string $stage, string $detail): string
+    {
+        $driverName = [
+            'local' => '本地存储',
+            's3' => 'S3 兼容存储',
+            'obs' => '华为云 OBS',
+            'cos' => '腾讯云 COS',
+            'oss' => '阿里云 OSS',
+            'sftp' => 'SFTP',
+        ][$driver] ?? $driver;
+
+        $hints = [
+            'local' => [
+                'connect_fail' => '检查存储根目录路径是否存在且可写',
+                'put_fail'      => '存储目录不可写：检查 owner/权限',
+                'get_fail'      => '存储目录不可读',
+            ],
+            's3' => [
+                'connect_fail' => '检查 Endpoint/Region/Bucket 是否正确，Access Key/Secret Key 是否有效',
+                'put_fail'      => 'AWS/IAM 用户没有 PutObject 权限，或桶策略禁止写',
+                'get_fail'      => 'AWS/IAM 用户没有 GetObject 权限，或对象不存在',
+            ],
+            'obs' => [
+                'connect_fail' => '❌ 华为云 OBS：检查 Endpoint/Region/Bucket 是否一致、Access Key (AK) 是否正确',
+                'put_fail'      => '❌ 华为云 OBS：AK/SK 没有 PutObject 权限 → 我的凭证 → IAM 用户 → 授权 OBS OperateAccess',
+                'get_fail'      => '❌ 华为云 OBS：桶 ACL 没有公共读 → 桶策略加 GetObject 允许',
+                'exception'     => '❌ 华为云 OBS 异常：' . $detail,
+            ],
+            'cos' => [
+                'connect_fail' => '❌ 腾讯云 COS：检查 Endpoint/Region/Bucket/SecretId 是否正确',
+                'put_fail'      => '❌ 腾讯云 COS：SecretId/SecretKey 没有 PutObject 权限 → CAM 策略授予 cos:PutObject，或检查桶 ACL 是「公有读私有写」',
+                'get_fail'      => '❌ 腾讯云 COS：桶 ACL 没有公共读 → 权限管理 → 公有读私有写',
+                'exception'     => '❌ 腾讯云 COS 异常：' . $detail,
+            ],
+            'oss' => [
+                'connect_fail' => '检查 Endpoint/Bucket/AccessKeyID 是否正确',
+                'put_fail'      => 'AccessKey 没有 PutObject 权限，或 RAM 策略禁止',
+                'get_fail'      => '桶 ACL 没有公共读',
+            ],
+            'sftp' => [
+                'connect_fail' => '检查主机/端口/用户名/密钥是否正确',
+                'put_fail'      => '远程目录不可写：检查 owner/权限',
+                'get_fail'      => '远程目录不可读',
+            ],
+        ];
+
+        return $hints[$driver][$stage] ?? "❌ {$driverName}：{$stage} " . $detail;
     }
 }

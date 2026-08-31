@@ -156,6 +156,7 @@ $router->get('/api-keys', [\App\Controllers\ApiKeyController::class, 'index']);
 $router->post('/api-keys', [\App\Controllers\ApiKeyController::class, 'create']);
 $router->post('/api-keys/toggle', [\App\Controllers\ApiKeyController::class, 'toggle']);
 $router->post('/api-keys/delete', [\App\Controllers\ApiKeyController::class, 'delete']);
+$router->post("/api-keys/debug-upload", [\App\Controllers\ApiKeyController::class, "debugUpload"]);
 $router->post('/api-keys/edit', [\App\Controllers\ApiKeyController::class, 'edit']);
 
 // 压缩配置（后台）

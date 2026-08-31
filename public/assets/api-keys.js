@@ -37,7 +37,9 @@
     // 通用 fetch + 错误处理
     async function apiPost(url, data) {
         var fd = new FormData();
-        fd.append('csrf_token', window.FREEIMG_CSRF);
+        // CSRF 优先取 window.FREEIMG_CSRF，缺失时回退到页面里第一个 hidden csrf_token（防御视图重构漏定义）
+        var csrf = window.FREEIMG_CSRF || ((document.querySelector('input[name="csrf_token"]') || {}).value || '');
+        fd.append('csrf_token', csrf);
         for (var k in data) { if (data.hasOwnProperty(k)) fd.append(k, data[k]); }
         // 防御性：清理 URL 双斜杠（nginx 默认不 merge_slashes 会 404）
         var cleanBase = (window.FREEIMG_BASE || '').replace(/\/+$/, '');

@@ -28,7 +28,9 @@ class UploadService
         }
 
         $tmp = $file['tmp_name'] ?? '';
-        if (!is_uploaded_file($tmp)) {
+        // _local_file：仅内部/CLI 使用（测试脚本、服务端导入），REST API 不会传入此参数，
+        // 用于绕过 is_uploaded_file 检查直接处理服务器本地文件
+        if (!is_uploaded_file($tmp) && empty($opts['_local_file'])) {
             return $this->fail('非法的上传文件');
         }
 
@@ -68,25 +70,47 @@ class UploadService
         }
 
         $sha256 = hash('sha256', $content);
-        $exist = $this->images->findBySha256($sha256, $userId);
-        if ($exist) {
-            return [
-                'success' => true,
-                'duplicate' => true,
-                'image'   => $exist,
-                'message' => '已存在相同图片，已返回原记录',
-            ];
+        // force_recompress=1：跳过 SHA256 去重，允许同一张图按不同压缩档重新压缩出多份记录
+        if (empty($opts['force_recompress'])) {
+            $exist = $this->images->findBySha256($sha256, $userId);
+            if ($exist) {
+                return [
+                    'success' => true,
+                    'duplicate' => true,
+                    'image'   => $exist,
+                    'message' => '已存在相同图片，已返回原记录',
+                ];
+            }
         }
 
         $qualityLevel = $opts['quality'] ?? (config('settings.default_compression') ?: 'balanced');
+        // 本次实际使用的压缩档代码（写库 compression 字段）：
+        // 有 profile → 用 profile.code；否则用 quality 档代码（original/saver/extreme/ultra...）
+        $compressionCode = !empty($opts['_compression_profile'])
+            ? (string)($opts['_compression_profile']['code'] ?? $qualityLevel)
+            : (string)$qualityLevel;
 
         // 从 Profile 拿参数（如果提供）
         if (!empty($opts['_compression_profile'])) {
             $profile = $opts['_compression_profile'];
             $maxW = (int)$profile['max_dimension'];
             $maxH = 0; // Profile 只配宽
-            $quality = (int)$profile['jpeg_quality'];
-            $format = null;
+            // output_format: auto/jpg/webp/png — 决定是否切换到 WebP（更小30%）
+            $of = (string)($profile['output_format'] ?? 'auto');
+            if ($of === 'webp') {
+                $quality = (int)$profile['webp_quality']; // webp 档时用 webp_quality
+                $format = 'webp';
+            } elseif ($of === 'jpg') {
+                $quality = (int)$profile['jpeg_quality'];
+                $format = 'jpg';
+            } elseif ($of === 'png') {
+                $quality = (int)$profile['png_compression'];
+                $format = 'png';
+            } else {
+                // auto：保留原图格式
+                $quality = (int)$profile['jpeg_quality'];
+                $format = null;
+            }
         } else {
             [$maxW, $maxH, $quality, $format] = $this->resolveQuality($qualityLevel, $opts);
         }
@@ -174,24 +198,10 @@ class UploadService
             $compSource = $skipByBrowser ? 'browser' : 'none';
             $preserved = true;
             @unlink($tempSrc);
-            // P1-2 修复：原图模式（不压缩、不走 chain）下，若 strip_exif 开启，
-            // 对 JPEG/PNG/WebP/BMP 仍做 GD 重绘剥 EXIF，防止 GPS/设备信息泄露。
-            // GIF 因有动画帧不在此剥。代价：原图模式文件会重编码（无损几乎无视觉差异）。
-            $stripExifOn = (int)(config('settings.strip_exif') ?? 1) === 1;
-            if ($stripExifOn && in_array($realMime, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true)) {
-                $tmpNoExif = $this->makeTempFile($storedContent, $realMime);
-                $rwChain = new \App\Processors\CompressionChain();
-                $rwResult = $rwChain->stripExifRewritePublic($tmpNoExif, $realMime);
-                @unlink($tmpNoExif);
-                if ($rwResult['success']) {
-                    $storedContent = file_get_contents($rwResult['output_path']);
-                    @unlink($rwResult['output_path']);
-                    $finalSize = strlen($storedContent);
-                    $ratio = $originalSize > 0 ? round($finalSize / $originalSize, 4) : 1.0;
-                    $compressor = 'gd-rewrite';
-                    $compSource = $skipByBrowser ? 'browser' : 'api-server';
-                }
-            }
+            // 原图档：保留原图字节（不缩放、不重编码、不剥 EXIF）
+            // 用户显式选「原图」=知情同意保留 EXIF（适合做图床、保留原始元数据）
+            // strip_exif 默认行为：仅对走 chain 压缩的档位生效（保护缩略图/压缩档）
+            // skipByBrowser（前端已压缩）也尊重用户意图：保留原字节
         } else {
             // ========== Phase 9.2：CompressionChain 统一入口 ==========
             $chain = new \App\Processors\CompressionChain();
@@ -210,6 +220,8 @@ class UploadService
                 'png_quality_max' => (int)($profile['png_quality_max'] ?? 80),
                 'min_quality'     => (int)($profile['minimum_quality'] ?? 30),
                 'target_size_kb' => (int)($profile['target_size_kb'] ?? 0),
+                // output_format: auto/jpg/webp/png — WebP 比 JPEG 小30%
+                'output_format'   => (string)($profile['output_format'] ?? 'auto'),
                 // strip_metadata 已废弃：GD 重编码本身就不写 EXIF/IPTC/XMP（GdProcessor 删了死代码）。
                 // 用 strip_exif（chain 层）统一控制剥 EXIF。
                 'strip_exif'      => (int)(config('settings.strip_exif') ?? 1),
@@ -311,6 +323,7 @@ class UploadService
             'original_mime'      => $realMime,
             'original_extension' => $ext,
             'compressor'         => $compressor ?? 'original',
+            'compression'        => $compressionCode,
             'compression_source' => $compSource ?? 'none',
             'created_at'         => date('Y-m-d H:i:s'),
             'updated_at'         => date('Y-m-d H:i:s'),
@@ -352,7 +365,8 @@ class UploadService
         }
 
         // 水印强一致：后台开启水印时，API 即使选"原图"也强制走水印分支
-        if (WatermarkConfigResolver::resolve() !== null) {
+        // 例外：调试模式（_debug_no_watermark=1）跳过强制水印，让原图档真的是原图
+        if (WatermarkConfigResolver::resolve() !== null && empty($opts['_debug_no_watermark'])) {
             $opts['_force_watermark'] = true;
         }
 
@@ -393,12 +407,15 @@ class UploadService
 
     private function resolveQuality(string $level, array $opts): array
     {
+        // 与 compression_profiles 表内置档保持一致（small 已更名 saver，保留 small 别名向后兼容）
         $preset = [
             'original' => [0, 0, 100, null],
             'high'     => [2048, 0, 85, null],
             'balanced' => [1600, 0, 70, null],
-            'saver'    => [1200, 0, 55, null],
-            'extreme'  => [900, 0, 40, null],
+            'saver'    => [1100, 0, 45, null],
+            'small'    => [1100, 0, 45, null], // 向后兼容：small = saver
+            'extreme'  => [800, 0, 30, null],
+            'ultra'    => [600, 0, 20, null],
         ];
 
         if (!empty($opts['max_width']) && isset($opts['quality'])) {

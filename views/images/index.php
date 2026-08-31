@@ -53,6 +53,15 @@
         <?php endif; ?>
     </div>
 <?php else: ?>
+    <!-- 批量选择条（仅批量模式可见） -->
+    <div class="batch-select-bar" id="batch-select-bar" style="display:none;">
+        <label class="batch-select-all">
+            <input type="checkbox" id="batch-select-all"> 全选当前页
+        </label>
+        <span class="batch-select-tip" id="batch-select-tip">已选 0 张 · 本页 <?= count($list['items']) ?> 张 · 共 <?= (int)$list['total'] ?> 张</span>
+        <button type="button" id="batch-select-all-pages" class="btn-link">☑️ 全选全部 <?= (int)$list['total'] ?> 张</button>
+    </div>
+
     <div class="image-grid">
         <?php foreach ($list['items'] as $img): ?>
             <div class="image-card-wrapper" data-id="<?= (int)$img['id'] ?>">
@@ -74,6 +83,9 @@
                         <div class="image-card-meta">
                             <span><?= number_format($img['final_size'] / 1024, 1) ?> KB</span>
                             <span class="saved">↓ <?= round((1 - $img['compression_ratio']) * 100, 0) ?>%</span>
+                            <?php if (!empty($img['compression'])): ?>
+                                <span class="compression-tag" title="使用的压缩档">🎚️ <?= htmlspecialchars($img['compression']) ?></span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </a>
@@ -88,7 +100,7 @@
     </div>
 
     <!-- 批量操作浮动栏 -->
-    <div id="batch-bar" style="display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--gray-900); color:#fff; padding:14px 20px; border-radius:30px; box-shadow:0 8px 32px rgba(0,0,0,0.3); display:flex; align-items:center; gap:12px; z-index:100;">
+    <div id="batch-bar" style="position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--gray-900); color:#fff; padding:14px 20px; border-radius:30px; box-shadow:0 8px 32px rgba(0,0,0,0.3); display:flex; align-items:center; gap:12px; z-index:100;">
         <span id="batch-count">已选 0 张</span>
         <button type="button" id="btn-batch-cancel" style="background:transparent; border:1px solid #fff; color:#fff; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;">取消</button>
         <button type="button" id="btn-batch-confirm" style="background:var(--red-500); border:none; color:#fff; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:13px;">🗑️ 删除选中</button>
@@ -108,4 +120,4 @@
 window.FREEIMG_CSRF = "<?= htmlspecialchars($csrf) ?>";
 window.FREEIMG_BASE = "<?= base_url() ?>";
 </script>
-<script src="/assets/images.js"></script>
+<script src="/assets/images.js?v=<?= @filemtime(FREEIMG_ROOT . '/public/assets/images.js') ?: time() ?>"></script>

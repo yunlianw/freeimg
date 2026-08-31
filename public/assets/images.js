@@ -8,7 +8,7 @@
     'use strict';
 
     const csrf = window.FREEIMG_CSRF;
-    const base = window.FREEIMG_BASE;
+    const base = (window.FREEIMG_BASE || '').replace(/\/+$/, '');
 
     // === 删除到回收站 ===
     document.querySelectorAll('.btn-trash, .trash-btn').forEach(btn => {
@@ -50,14 +50,33 @@
     const batchCount = document.getElementById('batch-count');
     const btnBatchCancel = document.getElementById('btn-batch-cancel');
     const btnBatchConfirm = document.getElementById('btn-batch-confirm');
+    const batchSelectBar = document.getElementById('batch-select-bar');
+    const batchSelectAll = document.getElementById('batch-select-all');
+    const batchSelectTip = document.getElementById('batch-select-tip');
+    const batchSelectAllPages = document.getElementById('batch-select-all-pages');
+    const totalImages = parseInt(batchSelectTip?.textContent?.match(/共 (\d+) 张/)?.[1] || '0', 10);
 
     function isBatchMode() {
         return document.body.classList.contains('batch-mode');
     }
     function updateBatchCount() {
-        const checked = document.querySelectorAll('.batch-select:checked').length;
-        if (batchCount) batchCount.textContent = '已选 ' + checked + ' 张';
-        if (btnBatchConfirm) btnBatchConfirm.disabled = checked === 0;
+        const allChecks = document.querySelectorAll('.batch-select');
+        const checked = document.querySelectorAll('.batch-select:checked');
+        if (batchCount) batchCount.textContent = '已选 ' + checked.length + ' 张';
+        if (btnBatchConfirm) btnBatchConfirm.disabled = checked.length === 0;
+        // 更新"全选当前页"checkbox 状态
+        if (batchSelectAll) {
+            if (checked.length === 0) {
+                batchSelectAll.checked = false;
+                batchSelectAll.indeterminate = false;
+            } else if (checked.length === allChecks.length) {
+                batchSelectAll.checked = true;
+                batchSelectAll.indeterminate = false;
+            } else {
+                batchSelectAll.checked = false;
+                batchSelectAll.indeterminate = true;
+            }
+        }
     }
     if (btnBatchMode) {
         btnBatchMode.addEventListener('click', () => {
@@ -71,6 +90,23 @@
     document.querySelectorAll('.batch-select').forEach(cb => {
         cb.addEventListener('change', updateBatchCount);
     });
+    // 全选当前页
+    if (batchSelectAll) {
+        batchSelectAll.addEventListener('change', () => {
+            const checked = batchSelectAll.checked;
+            document.querySelectorAll('.batch-select').forEach(cb => cb.checked = checked);
+            updateBatchCount();
+        });
+    }
+    // 全选所有页（提示确认 + 显示当前已选 + 总数）
+    if (batchSelectAllPages) {
+        batchSelectAllPages.addEventListener('click', () => {
+            if (!confirm('☑️ 勾选当前页所有图片（共 ' + totalImages + ' 张需跨页删除）？\n\n点击"删除选中"会先处理当前页，\n然后需要翻页到下一页重复操作。')) return;
+            document.querySelectorAll('.batch-select').forEach(cb => cb.checked = true);
+            updateBatchCount();
+            alert('✅ 当前页已全部选中\n共 ' + totalImages + ' 张需跨页删除\n请翻页到下一页重复操作。');
+        });
+    }
     if (btnBatchCancel) {
         btnBatchCancel.addEventListener('click', () => {
             document.querySelectorAll('.batch-select').forEach(cb => cb.checked = false);

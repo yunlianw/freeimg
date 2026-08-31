@@ -78,6 +78,7 @@
                     <?php endif; ?>
                 </td>
                 <td style="padding:12px 16px; font-size:13px; color:var(--gray-600);">
+                    <code>格式<?= htmlspecialchars(strtoupper($p['output_format'] ?? 'auto')) ?></code>
                     <code>宽≤<?= (int)$p['max_dimension'] ?>px</code>
                     <code>JPEG q<?= (int)$p['jpeg_quality'] ?></code>
                     <code>WebP q<?= (int)$p['webp_quality'] ?></code>
@@ -100,7 +101,7 @@
                         <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                         <button type="submit" class="btn-link"><?= $p['enabled'] ? '禁用' : '启用' ?></button>
                     </form>
-                    <?php if (!$p['is_builtin']): ?>
+                    <?php if (!$p['is_builtin'] || !$p['enabled']): ?>
                         <button type="button" class="btn-link edit-profile-btn" data-id="<?= (int)$p['id'] ?>"
                             data-name="<?= h($p['name']) ?>"
                             data-desc="<?= h($p['description'] ?? '') ?>"
@@ -111,7 +112,8 @@
                             data-target="<?= (int)$p['target_size_kb'] ?>"
                             data-minq="<?= (int)$p['minimum_quality'] ?>"
                             data-strip="<?= (int)$p['strip_metadata'] ?>"
-                            data-sort="<?= (int)$p['sort_order'] ?>">编辑</button>
+                            data-sort="<?= (int)$p['sort_order'] ?>"
+                            data-format="<?= h($p['output_format'] ?? 'auto') ?>">编辑</button>
                         <form method="POST" action="<?= base_url('compression/delete') ?>" style="display:inline;" class="delete-profile-form" data-name="<?= h($p['name']) ?>">
                             <input type="hidden" name="csrf_token" value="<?= h($csrf) ?>">
                             <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
@@ -142,6 +144,15 @@
             <div class="form-group">
                 <label>最大边长 px</label>
                 <input type="number" name="max_dimension" min="100" max="10000" value="1600">
+            </div>
+            <div class="form-group">
+                <label>输出格式</label>
+                <select name="output_format">
+                    <option value="auto">自动（保留原格式）</option>
+                    <option value="jpg">JPEG</option>
+                    <option value="webp">WebP（小 30%）</option>
+                    <option value="png">PNG</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>JPEG 质量</label>
@@ -231,6 +242,15 @@
                         <input type="checkbox" name="strip_metadata" value="1" id="edit-strip"> 去除元数据
                     </label>
                 </div>
+                <div class="form-group">
+                    <label>输出格式</label>
+                    <select name="output_format" id="edit-format">
+                        <option value="auto">自动（保留原格式）</option>
+                        <option value="jpg">JPEG</option>
+                        <option value="webp">WebP（小 30%）</option>
+                        <option value="png">PNG</option>
+                    </select>
+                </div>
             </div>
             <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
                 <button type="button" class="btn-link" onclick="document.getElementById('edit-modal').style.display='none'">取消</button>
@@ -258,6 +278,7 @@
             document.getElementById('edit-minq').value = d.minq;
             document.getElementById('edit-sort').value = d.sort;
             document.getElementById('edit-strip').checked = d.strip === '1';
+            document.getElementById('edit-format').value = d.format || 'auto';
             document.getElementById('edit-modal').style.display = 'flex';
         });
     });

@@ -43,6 +43,24 @@ class CosStorage implements StorageDriverInterface
         $this->publicUrl = isset($config['public_url']) ? rtrim($config['public_url'], '/') : null;
     }
 
+    /**
+     * 智能判断：是否需要在 endpoint 中拼 bucket
+     * 真实 COS 桶域名格式: {bucket}-{appid}.cos.{region}.myqcloud.com
+     * 当 endpoint 形如 cos.{region}.myqcloud.com（无 bucket）→ 需要拼
+     * 当 endpoint 形如 {bucket}-{appid}.cos.{region}.myqcloud.com（已含 bucket）→ 直接用
+     */
+    private function buildHost(): string
+    {
+        $host = $this->endpoint;
+        // 如果 endpoint 已经包含了桶名前缀（如 "ceshi-1345376568.cos.ap-beijing-1.myqcloud.com"），直接用
+        if (str_starts_with($host, $this->bucket . '.') || str_starts_with($host, $this->bucket . '-')) {
+            return $host;
+        }
+        // 否则按 {bucket}.cos.{region}.myqcloud.com 拼
+        // 注意：COS 桶名已包含 -appid 后缀（如 mybucket-1250000000），直接拼即可
+        return $this->bucket . '.' . $host;
+    }
+
     public function driverName(): string
     {
         return 'cos';
@@ -113,18 +131,17 @@ class CosStorage implements StorageDriverInterface
     public function url(string $path): string
     {
         if ($this->publicUrl) return $this->publicUrl . '/' . ltrim($path, '/');
-        // COS 公开访问 URL：{bucket}-{appid}.cos.{region}.myqcloud.com/{path}
-        $host = str_replace('{bucket}', $this->bucket, $this->endpoint);
-        return $host . '/' . ltrim($path, '/');
+        // COS 公开访问 URL：{bucket}.cos.{region}.myqcloud.com/{path}
+        return $this->scheme . '://' . $this->buildHost() . '/' . ltrim($path, '/');
     }
 
     public function testConnection(): bool
     {
-        // GET / → 200/404 都可以
-        $headers = $this->signedHeaders('HEAD', '');
+        // 用 GET 探测桶（HEAD 在某些腾讯云网关会被拒），200/403/404 都算能联通
+        $headers = $this->signedHeaders('GET', '');
         $url = $this->bucketUrl('');
-        $resp = $this->httpRequest('HEAD', $url, $headers);
-        return $resp !== null && ($resp['code'] === 200 || $resp['code'] === 404);
+        $resp = $this->httpRequest('GET', $url, $headers);
+        return $resp !== null && in_array($resp['code'], [200, 204, 403, 404], true);
     }
 
     public function usage(): int
@@ -150,7 +167,7 @@ class CosStorage implements StorageDriverInterface
 
     private function bucketUrl(string $path): string
     {
-        return $this->scheme . '://' . $this->endpoint . '/' . ltrim($path, '/');
+        return $this->scheme . '://' . $this->buildHost() . '/' . ltrim($path, '/');
     }
 
     /**
@@ -162,8 +179,6 @@ class CosStorage implements StorageDriverInterface
         $now = time();
         $dateShort = gmdate('Y-m-d', $now);
         $dateTime = gmdate('Y-m-d\TH:i:s\Z', $now);
-
-        $host = parse_url($this->endpoint, PHP_URL_HOST);
 
         // URI: path 已是相对路径，前面带 /
         $canonicalUri = '/' . ltrim($path, '/');
@@ -182,7 +197,7 @@ class CosStorage implements StorageDriverInterface
         // Canonical headers（按小写字母排序）
         $contentSha256 = hash('sha256', $body);
         $headersArr = [
-            'host'                  => $host,
+            'host'                  => $this->buildHost(),
             'x-amz-content-sha256'  => $contentSha256,
             'x-amz-date'            => $dateTime,
         ];
@@ -229,7 +244,7 @@ class CosStorage implements StorageDriverInterface
 
         $httpHeaders = [
             'Authorization: ' . $authorization,
-            'Host: ' . $host,
+            'Host: ' . $this->buildHost(),
             'x-amz-content-sha256: ' . $contentSha256,
             'x-amz-date: ' . $dateTime,
         ];

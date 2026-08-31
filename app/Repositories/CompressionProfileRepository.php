@@ -19,6 +19,10 @@ class CompressionProfileRepository
 
     public function findByCode(string $code): ?array
     {
+        // 向后兼容：small 已更名 saver（同一档位）
+        if ($code === 'small') {
+            $code = 'saver';
+        }
         return Db::fetchOne('SELECT * FROM compression_profiles WHERE code = :c', ['c' => $code]);
     }
 
@@ -33,7 +37,8 @@ class CompressionProfileRepository
     public function update(int $id, array $data): int
     {
         $row = $this->find($id);
-        if (!$row || $row['is_builtin']) {
+        // 已禁用的内置档允许编辑（否则清理不掉）
+        if (!$row || ($row['is_builtin'] && $row['enabled'])) {
             return 0;
         }
         $data['updated_at'] = date('Y-m-d H:i:s');
@@ -44,19 +49,18 @@ class CompressionProfileRepository
     public function delete(int $id): int
     {
         $row = $this->find($id);
-        if (!$row || $row['is_builtin']) {
+        // 已禁用的内置档允许删除（防止"死档"残留）
+        if (!$row || ($row['is_builtin'] && $row['enabled'])) {
             return 0;
         }
         return Db::delete('compression_profiles', 'id = :id', ['id' => $id]);
     }
 
     /**
-     * 解析压缩配置：按优先级查找
-     * 优先级：opts 显式 > apiKey 关联 > settings.api > settings.web > balanced
-     */
-    /**
-     * 解析压缩配置：按优先级查找
-     * 优先级：opts 显式 > apiKey 关联 > settings.api > settings.web > balanced
+     * 解析压缩配置：按优先级查找（API 上下文）
+     * 优先级：opts 显式 > apiKey 关联 > settings.api_compression_profile_id > balanced（显式兜底）
+     * 注意：API 不静默回退到 Web 默认档（web_compression_profile_id），
+     *       未配置时明确用 balanced，保证 API 行为可预期。
      */
     public function resolve(array $opts = [], ?array $apiKey = null): array
     {
@@ -77,18 +81,14 @@ class CompressionProfileRepository
             if ($p) return $p;
         }
 
+        // API 全局默认档（后台"压缩设置→API 默认压缩档"）
         $apiId = (int)(config('settings.api_compression_profile_id') ?? 0);
         if ($apiId) {
             $p = $this->find($apiId);
             if ($p) return $p;
         }
 
-        $webId = (int)(config('settings.web_compression_profile_id') ?? 0);
-        if ($webId) {
-            $p = $this->find($webId);
-            if ($p) return $p;
-        }
-
+        // 显式兜底：balanced（不再静默回退到 Web 档）
         return $this->findByCode('balanced') ?? [];
     }
 }

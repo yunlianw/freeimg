@@ -67,10 +67,11 @@ class RestApiController
         }
 
         $opts = [
-            'quality'    => $request->post('compression', '') ?: null,
-            'compression'=> $request->post('compression', '') ?: null,
-            'folder_id'  => $request->post('folder_id', '') ?: null,
-            'is_public'  => $request->post('is_public', 1),
+            'quality'          => $request->post('compression', '') ?: null,
+            'compression'      => $request->post('compression', '') ?: null,
+            'force_recompress' => in_array(strtolower((string)$request->post('force_recompress', '')), ['1', 'true', 'yes', 'on'], true) ? 1 : 0,
+            'folder_id'        => $request->post('folder_id', '') ?: null,
+            'is_public'        => $request->post('is_public', 1),
         ];
 
         $svc = new UploadService();
@@ -83,6 +84,7 @@ class RestApiController
         Response::json([
             'success'   => true,
             'duplicate' => $result['duplicate'] ?? false,
+            'compression' => $result['image']['compression'] ?? null,
             'image'     => [
                 'id'          => $result['image']['id'],
                 'url'         => $result['image']['public_url'],
@@ -91,6 +93,7 @@ class RestApiController
                 'height'      => (int)$result['image']['height'],
                 'size'        => (int)$result['image']['final_size'],
                 'mime'        => $result['image']['mime_type'],
+                'compression' => $result['image']['compression'] ?? null,
                 'storage_path'=> $result['image']['storage_path'],
                 'sha256'      => $result['image']['sha256'],
             ],
@@ -123,7 +126,7 @@ class RestApiController
             "SELECT id, uuid, original_name, stored_name, extension, mime_type,
                     width, height, original_size, final_size, compression_ratio,
                     storage_path, public_url, folder_id, is_public,
-                    sha256, created_at
+                    compression, sha256, created_at
              FROM images
              WHERE user_id = :uid AND status = 'active'" . $extra . "
              ORDER BY id DESC
@@ -155,6 +158,7 @@ class RestApiController
                     'size'             => (int)$r['final_size'],
                     'original_size'    => (int)$r['original_size'],
                     'compression_ratio'=> (float)$r['compression_ratio'],
+                    'compression'      => $r['compression'] ?? null,
                     'folder_id'        => $r['folder_id'] !== null ? (int)$r['folder_id'] : null,
                     'is_public'        => (int)$r['is_public'],
                     'sha256'           => $r['sha256'],
@@ -197,6 +201,7 @@ class RestApiController
                 'size'             => (int)$row['final_size'],
                 'original_size'    => (int)$row['original_size'],
                 'compression_ratio'=> (float)$row['compression_ratio'],
+                'compression'      => $row['compression'] ?? null,
                 'folder_id'        => $row['folder_id'] !== null ? (int)$row['folder_id'] : null,
                 'is_public'        => (int)$row['is_public'],
                 'sha256'           => $row['sha256'],

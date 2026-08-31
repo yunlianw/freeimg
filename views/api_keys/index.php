@@ -1,6 +1,6 @@
 <link rel="stylesheet" href="<?= htmlspecialchars(base_url('assets/api-keys.css')) ?>?v=<?= filemtime(FREEIMG_ROOT . '/public/assets/api-keys.css') ?>">
-<script>window.FREEIMG_CSRF = "<?= htmlspecialchars($csrf) ?>";window.FREEIMG_BASE = "<?= htmlspecialchars(rtrim(base_url(), '/')) ?>";</script>
-<script src="<?= htmlspecialchars(base_url('assets/api-keys.js')) ?>?v=20260829" defer></script>
+<script>window.FREEIMG_CSRF = "<?= htmlspecialchars($csrf) ?>";</script>
+<script src="<?= htmlspecialchars(base_url('assets/api-keys.js')) ?>?v=20260901" defer></script>
 
 <div class="page-header">
     <div>
@@ -11,6 +11,247 @@
         <a href="<?= base_url('settings') ?>" class="btn-ghost">⚙️ 设置</a>
     </div>
 </div>
+
+<!-- 🔧 API 调试工具（上传 + 压缩档对比） -->
+<div class="api-debug-card" id="api-debug-card">
+    <div class="api-debug-header">
+        <h2>🔧 API 调试工具</h2>
+        <p>在线测试上传接口 + 实时对比各压缩档效果（用专用测试 Key，调试上传的图片自动 force_recompress=1）</p>
+    </div>
+
+    <div class="api-debug-body">
+        <form id="api-debug-form" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+
+            <div class="api-debug-row">
+                <div class="api-debug-field api-debug-file">
+                    <label>📁 选择图片</label>
+                    <input type="file" name="file" id="api-debug-file" accept="image/*" required>
+                    <div class="api-debug-file-preview" id="api-debug-preview"></div>
+                </div>
+
+                <div class="api-debug-field api-debug-compression">
+                    <label>🎚️ 压缩档位（同步 /compression 配置）</label>
+                    <select name="compression" id="api-debug-compression">
+                        <?php foreach ($profiles as $p): ?>
+                            <option value="<?= htmlspecialchars($p['code']) ?>"
+                                <?= $p['code'] === 'balanced' ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($p['name']) ?>
+                                (<?= (int)$p['max_dimension'] ?>px / <?= strtoupper($p['output_format'] ?? 'auto') ?> q<?= (int)$p['jpeg_quality'] ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="btn-primary api-debug-submit" id="api-debug-submit">
+                        🚀 上传测试
+                    </button>
+                </div>
+            </div>
+        </form>
+
+    <div class="api-debug-result" id="api-debug-result" style="display:none;"></div>
+    </div>
+</div>
+
+<style>
+.api-debug-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 0 0 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.api-debug-header h2 { margin: 0 0 4px; font-size: 18px; }
+.api-debug-header p { margin: 0 0 16px; color: #64748b; font-size: 14px; }
+.api-debug-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.api-debug-field label { display:block; font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #475569; }
+.api-debug-file input[type=file] {
+    display:block; width:100%; padding: 10px 12px;
+    border: 1px dashed #cbd5e1; border-radius: 8px;
+    background: #f8fafc; font-size: 13px;
+}
+.api-debug-file-preview {
+    margin-top: 10px; min-height: 60px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: #64748b;
+}
+.api-debug-file-preview img {
+    max-height: 80px; max-width: 120px;
+    border-radius: 6px; border: 1px solid #e2e8f0;
+}
+.api-debug-compression select {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    background: #fff; font-size: 14px; margin-bottom: 12px;
+}
+.api-debug-submit {
+    width: 100%; padding: 10px;
+    background: #3b82f6;
+    border: none; border-radius: 8px;
+    color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
+}
+.api-debug-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+.api-debug-result {
+    margin-top: 18px; padding: 18px;
+    background: #f8fafc; border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+.api-debug-result h3 { margin: 0 0 12px; font-size: 16px; }
+.api-debug-result.success h3 { color: #16a34a; }
+.api-debug-result.error h3 { color: #dc2626; }
+.api-debug-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+}
+.api-debug-stat {
+    background: #fff; padding: 12px;
+    border-radius: 8px; border: 1px solid #e2e8f0;
+}
+.api-debug-stat-label { font-size: 12px; color: #94a3b8; }
+.api-debug-stat-value { font-size: 20px; font-weight: 700; color: #1e293b; margin-top: 4px; }
+.api-debug-stat-value.small { color: #16a34a; }
+.api-debug-comparison {
+    display: flex; gap: 14px; align-items: center;
+    padding: 12px; background: #fff; border-radius: 8px;
+    border: 1px solid #e2e8f0; flex-wrap: wrap;
+}
+.api-debug-comparison > div { flex: 1; min-width: 0; }
+.api-debug-comparison img {
+    max-height: 100px; max-width: 100%;
+    border-radius: 6px; border: 1px solid #e2e8f0;
+}
+@media (max-width: 768px) {
+    .api-debug-row { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+(function () {
+    const fileInput = document.getElementById('api-debug-file');
+    const preview = document.getElementById('api-debug-preview');
+    const compressionSel = document.getElementById('api-debug-compression');
+    const form = document.getElementById('api-debug-form');
+    const submitBtn = document.getElementById('api-debug-submit');
+    const resultBox = document.getElementById('api-debug-result');
+
+    // 选中文件预览
+    fileInput?.addEventListener('change', () => {
+        const f = fileInput.files[0];
+        preview.innerHTML = '';
+        if (!f) return;
+        const sizeKB = (f.size / 1024).toFixed(1);
+        const url = URL.createObjectURL(f);
+        const img = document.createElement('img');
+        img.src = url;
+        img.onload = () => URL.revokeObjectURL(url);
+        const meta = document.createElement('div');
+        meta.innerHTML = `<strong>${escapeHtml(f.name)}</strong><br>${sizeKB} KB · ${f.type || '?'}`;
+        preview.appendChild(img);
+        preview.appendChild(meta);
+    });
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function formatBytes(n) {
+        if (n < 1024) return n + ' B';
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+        return (n / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    // 提交调试上传
+    form?.addEventListener('submit', async e => {
+        e.preventDefault();
+        if (!fileInput.files[0]) {
+            alert('请先选择一张图片');
+            return;
+        }
+        submitBtn.disabled = true;
+        const origText = submitBtn.textContent;
+        submitBtn.textContent = '⏳ 上传中…';
+        resultBox.style.display = 'none';
+        resultBox.className = 'api-debug-result';
+
+        try {
+            const fd = new FormData(form);
+            // 防御性归一化：FREEIMG_BASE 可能带/不带尾部斜杠，统一去尾再拼接
+            const base = (window.FREEIMG_BASE || '').replace(/\/+$/, '');
+            const res = await fetch(base + '/api-keys/debug-upload', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data || !data.success) {
+                resultBox.className = 'api-debug-result error';
+                resultBox.style.display = '';
+                resultBox.innerHTML = '<h3>❌ ' + escapeHtml((data && data.message) || ('HTTP ' + res.status)) + '</h3>' +
+                    '<div style="margin-top:10px;font-size:12px;color:#64748b;">期望 URL: ' + escapeHtml(base + '/api-keys/debug-upload') + '<br>实际请求 URL: ' + escapeHtml(res.url || '?') + '<br>Status: ' + res.status + ' ' + res.statusText + '</div>';
+                return;
+            }
+
+            // 成功
+            const img = data.image;
+            const ratio = data.size_before / Math.max(1, data.size_after);
+            const savedPct = ((1 - data.size_after / data.size_before) * 100).toFixed(1);
+            resultBox.className = 'api-debug-result success';
+            resultBox.style.display = '';
+            resultBox.innerHTML = `
+                <h3>✅ 调试上传成功 · 档位 <code>${escapeHtml(data.compression)}</code></h3>
+                <div class="api-debug-stats">
+                    <div class="api-debug-stat">
+                        <div class="api-debug-stat-label">原始大小</div>
+                        <div class="api-debug-stat-value">${formatBytes(data.size_before)}</div>
+                    </div>
+                    <div class="api-debug-stat">
+                        <div class="api-debug-stat-label">压缩后</div>
+                        <div class="api-debug-stat-value small">${formatBytes(data.size_after)}</div>
+                    </div>
+                    <div class="api-debug-stat">
+                        <div class="api-debug-stat-label">节省</div>
+                        <div class="api-debug-stat-value small">${savedPct}%</div>
+                    </div>
+                    <div class="api-debug-stat">
+                        <div class="api-debug-stat-label">压缩比</div>
+                        <div class="api-debug-stat-value">${ratio.toFixed(2)}x</div>
+                    </div>
+                    <div class="api-debug-stat">
+                        <div class="api-debug-stat-label">尺寸</div>
+                        <div class="api-debug-stat-value">${img.width}×${img.height}</div>
+                    </div>
+                    <div class="api-debug-stat">
+                        <div class="api-debug-stat-label">压缩方式</div>
+                        <div class="api-debug-stat-value">${escapeHtml(img.compressor || '?')}</div>
+                    </div>
+                </div>
+                <div class="api-debug-comparison">
+                    <div>
+                        <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">原图</div>
+                        <img src="${preview.querySelector('img')?.src || ''}" alt="原图">
+                    </div>
+                    <div>
+                        <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">压缩后</div>
+                        <img src="${escapeHtml(img.public_url)}" alt="压缩后">
+                    </div>
+                </div>
+                <details style="margin-top:14px;font-size:12px;color:#64748b;">
+                    <summary style="cursor:pointer;">📋 原始响应 JSON</summary>
+                    <pre style="background:#1e293b;color:#cbd5e1;padding:10px;border-radius:6px;overflow:auto;max-height:300px;font-size:11px;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+                </details>
+            `;
+        } catch (err) {
+            resultBox.className = 'api-debug-result error';
+            resultBox.style.display = '';
+            resultBox.innerHTML = '<h3>❌ 网络错误：' + escapeHtml(err.message) + '</h3>';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = origText;
+        }
+    });
+})();
+</script>
 
 <!-- 🚨 API 安全提示 -->
 <div class="security-banner">
@@ -44,8 +285,10 @@
 
 <?php
 $apiBaseUrl = rtrim(base_url(), '/');
-$totalKeys = count($keys);
-$activeCount = count(array_filter($keys, fn($k) => (int)$k['status'] === 1));
+// 过滤 __debug__ 专用 Key（不计入用户可见统计）
+$visibleKeys = array_filter($keys, fn($k) => ($k['name'] ?? '') !== '__debug__');
+$totalKeys = count($visibleKeys);
+$activeCount = count(array_filter($visibleKeys, fn($k) => (int)$k['status'] === 1));
 ?>
 
 <?php if (!empty($_SESSION['new_api_key_secret'])): $showSecret = $_SESSION['new_api_key_secret']; $showName = $_SESSION['new_api_key_name'] ?? ''; $showAccessKey = $_SESSION['new_api_key_access'] ?? ''; unset($_SESSION['new_api_key_secret'], $_SESSION['new_api_key_name'], $_SESSION['new_api_key_id'], $_SESSION['new_api_key_access']); ?>
@@ -142,7 +385,7 @@ $activeCount = count(array_filter($keys, fn($k) => (int)$k['status'] === 1));
         </div>
     <?php else: ?>
         <div class="key-list">
-            <?php foreach ($keys as $k): $ak = htmlspecialchars($k['access_key']); $kid = (int)$k['id']; ?>
+            <?php foreach ($keys as $k): if (($k['name'] ?? '') === '__debug__') continue; $ak = htmlspecialchars($k['access_key']); $kid = (int)$k['id']; ?>
                 <div class="key-card" data-key-id="<?= $kid ?>">
                     <!-- 头部：状态指示条 -->
                     <div class="key-card-strip <?= $k['status'] ? 'is-active' : 'is-disabled' ?>"></div>

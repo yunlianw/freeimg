@@ -7,14 +7,13 @@
                 <span class="crumb-sep">/</span>
                 <span class="crumb-current"><?= h($folder['name']) ?></span>
             </div>
-            <p class="subtitle">共 <?= (int)$list['total'] ?> 张图片</p>
+            <p class="subtitle">共 <?= (int)$list['total'] ?> 张图片<?= !empty($folder['share_token']) ? ' · 🔗 已分享' : '' ?></p>
         </div>
         <div class="page-actions">
             <button type="button" class="btn-primary" id="open-picker-btn" data-folder-id="<?= (int)$folder['id'] ?>">
                 ➕ 添加图片
             </button>
-            <a href="<?= base_url('upload') ?>" class="btn-secondary">📤 上传</a>
-            <a href="<?= base_url('albums') ?>" class="btn-link">← 返回</a>
+            <a href="<?= base_url('albums') ?>" class="btn-link">← 返回列表</a>
         </div>
     </div>
 
@@ -107,14 +106,16 @@
     <input type="hidden" name="folder_id" value="<?= (int)$folder['id'] ?>">
     <div id="picker-hidden-ids"></div>
 </form>
-
 <script>
+
+
 (function () {
     const folderId = <?= (int)$folder['id'] ?>;
     const csrfToken = <?= json_encode($csrf) ?>;
     const modal = document.getElementById('picker-modal');
     const openBtns = [document.getElementById('open-picker-btn')].concat(
-        Array.from(document.querySelectorAll('[data-folder-id]')).filter(b => b.id !== 'open-picker-btn')
+        Array.from(document.querySelectorAll('[data-folder-id]'))
+            .filter(b => b.id !== 'open-picker-btn' && !b.hasAttribute('data-share-btn'))
     );
     const grid = document.getElementById('picker-grid');
     const subDirsEl = document.getElementById('picker-subdirs');
@@ -150,10 +151,23 @@
         subDirsEl.innerHTML = '';
         paginationEl.innerHTML = '';
 
-        const url = window.FREEIMG_BASE + 'albums/picker?folder_id=' + folderId + '&path=' + encodeURIComponent(path) + '&page=' + page;
+        // 防御性拼接：FREEIMG_BASE 可能带/不带尾部斜杠，统一归一化后补一个 '/'
+        const base = (window.FREEIMG_BASE || '').replace(/\/+$/, '');
+        const url = base + '/albums/picker?folder_id=' + folderId + '&path=' + encodeURIComponent(path) + '&page=' + page;
         try {
-            const res = await fetch(url, { credentials: 'same-origin' });
-            const data = await res.json();
+            const res = await fetch(url, {
+                credentials: 'same-origin',
+                mode: 'same-origin',
+                cache: 'no-store',
+                redirect: 'follow',
+                headers: { 'Accept': 'application/json' },
+            });
+            // 网络层错（如 CORS、DNS、超时）走到这里
+            const data = await res.json().catch(parseErr => {
+                grid.innerHTML = '<div class="picker-empty">❌ 响应不是 JSON（HTTP ' + res.status + ' ' + res.statusText + '）。可能：<br>1. 登录态过期，刷新页重试<br>2. 反代/防火墙拦截<br>3. 服务端错误<br><br>URL: ' + url + '</div>';
+                return null;
+            });
+            if (!data) return;
             if (!data.success) {
                 grid.innerHTML = '<div class="picker-empty">' + (data.message || '加载失败') + '</div>';
                 return;

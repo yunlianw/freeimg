@@ -83,7 +83,11 @@ $currentPath = $_SERVER['REQUEST_URI'] ?? '/';
     <?= $content ?>
 </main>
 <script>
-window.FREEIMG_BASE = "<?= htmlspecialchars(rtrim(base_url(), '/')) ?>";
+// 统一去尾斜杠（不带尾）。所有页面拼接 URL 时必须归一化：
+//   const base = (window.FREEIMG_BASE || '').replace(/\/+$/, '');
+//   fetch(base + '/path', ...)
+// 这样可以避免 https://域名/path 双斜杠 / 域名path 无斜杠 两类错误。
+window.FREEIMG_BASE = "<?= htmlspecialchars(rtrim(base_url(), "/")) ?>";
 (function() {
     var btn = document.getElementById('hamburger-btn');
     var drawer = document.getElementById('mobile-drawer');

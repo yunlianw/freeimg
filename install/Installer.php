@@ -118,17 +118,17 @@ class Installer
     public function seedCompressionProfiles(): void
     {
         $profiles = [
-            // [name, code, description, max_dim, jpeg_q, webp_q, png_zip, target_kb, min_q, strip, builtin, sort, png_qmin, png_qmax]
-            ['原图', 'original', '不缩放不压缩', 0, 100, 100, 6, 0, 40, 1, 1, 0, 95, 100],
-            ['高清', 'high', '2048px / JPEG 85 / 适合原画质', 2048, 85, 85, 6, 0, 60, 1, 1, 1, 80, 95],
-            ['均衡', 'balanced', '1600px / JPEG 70 / 约 50-100KB', 1600, 70, 70, 6, 100, 40, 1, 1, 2, 65, 85],
-            ['省流', 'small', '1100px / JPEG 45 / 约 100KB', 1100, 45, 45, 6, 100, 30, 1, 1, 3, 55, 75],
-            ['极限省流', 'extreme', '800px / JPEG 30 / 约 40KB', 800, 30, 30, 9, 40, 20, 1, 1, 4, 40, 60],
-            ['自定义', 'custom', '默认参数，可在后台修改', 1600, 70, 70, 6, 0, 40, 1, 0, 99, 50, 70],
+            // [name, code, description, max_dim, jpeg_q, webp_q, png_zip, target_kb, min_q, strip, builtin, sort, png_qmin, png_qmax, output_format]
+            ['原图', 'original', '不缩放不压缩', 0, 100, 100, 6, 0, 40, 1, 1, 1, 95, 100, 'auto'],
+            ['高清', 'high', '2048px / JPEG 85 / 适合原画质', 2048, 85, 85, 6, 0, 60, 1, 1, 2, 80, 95, 'auto'],
+            ['均衡', 'balanced', '1600px / JPEG 70 / 约 50-100KB', 1600, 70, 70, 6, 100, 40, 1, 1, 3, 65, 85, 'auto'],
+            ['省流', 'saver', '1100px / JPEG 45 / 约 50-80KB', 1100, 45, 45, 6, 80, 30, 1, 1, 4, 55, 75, 'auto'],
+            ['极限压缩', 'mega', '400px / WebP 15 / 目标 ≤ 20KB', 400, 15, 15, 6, 20, 10, 1, 1, 5, 30, 50, 'webp'],
+            ['自定义', 'custom', '默认参数，可在后台修改', 1600, 70, 70, 6, 0, 40, 1, 0, 99, 50, 70, 'auto'],
         ];
         $stmt = $this->pdo->prepare(
-            "INSERT IGNORE INTO compression_profiles (name, code, description, max_dimension, jpeg_quality, webp_quality, png_compression, target_size_kb, minimum_quality, strip_metadata, is_builtin, sort_order, png_quality_min, png_quality_max, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+            "INSERT IGNORE INTO compression_profiles (name, code, description, max_dimension, jpeg_quality, webp_quality, png_compression, target_size_kb, minimum_quality, strip_metadata, is_builtin, sort_order, png_quality_min, png_quality_max, output_format, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
         );
         foreach ($profiles as $p) {
             $stmt->execute($p);

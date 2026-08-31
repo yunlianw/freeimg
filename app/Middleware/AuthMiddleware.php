@@ -39,6 +39,10 @@ class AuthMiddleware
 
     private static function isAjax(): bool
     {
-        return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+        if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest') return true;
+        // 任何期望 JSON 响应的请求都视为 Ajax（fetch 默认 Accept 含 */*，但前端若显式 json 则 ajax）
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+        if (stripos($accept, 'application/json') !== false) return true;
+        return false;
     }
 }

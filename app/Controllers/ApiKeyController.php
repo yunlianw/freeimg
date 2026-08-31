@@ -6,6 +6,7 @@ use App\Core\Response;
 use App\Services\AuthService;
 use App\Middleware\AuthMiddleware;
 use App\Repositories\ApiKeyRepository;
+use App\Repositories\DebugKeyRepository;
 use App\Repositories\CompressionProfileRepository;
 use App\Services\UploadService;
 use App\Core\Db;
@@ -20,7 +21,7 @@ class ApiKeyController
     {
         AuthMiddleware::handle();
         $user = AuthService::user();
-        $repo = new ApiKeyRepository();
+                $repo = new ApiKeyRepository();
         $keys = $repo->listByUser((int)$user['id']);
         $profileRepo = new CompressionProfileRepository();
         $profiles = $profileRepo->listEnabled();
@@ -70,7 +71,7 @@ class ApiKeyController
             $expiresAt = date('Y-m-d H:i:s', $ts);
         }
 
-        $repo = new ApiKeyRepository();
+                $repo = new ApiKeyRepository();
         $result = $repo->create((int)$user['id'], $name, $profileId, $expiresAt);
 
         // 把 secret_key 临时存 session，让 create 页能显示一次
@@ -103,7 +104,7 @@ class ApiKeyController
             Response::json(['ok' => false, 'message' => '参数错误']);
         }
 
-        $repo = new ApiKeyRepository();
+                $repo = new ApiKeyRepository();
         $row = $repo->findById($id);
         if (!$row || (int)$row['user_id'] !== (int)$user['id']) {
             Response::json(['ok' => false, 'message' => 'API Key 不存在']);
@@ -155,7 +156,7 @@ class ApiKeyController
             Response::json(['success' => false, 'message' => '参数无效'], 400);
         }
 
-        $repo = new ApiKeyRepository();
+                $repo = new ApiKeyRepository();
         $row = $repo->findById($id);
         if (!$row || (int)$row['user_id'] !== (int)$user['id']) {
             Response::json(['success' => false, 'message' => '未找到或无权操作'], 403);
@@ -180,12 +181,78 @@ class ApiKeyController
             Response::json(['success' => false, 'message' => '会话已过期'], 419);
         }
         $id = (int)$request->post('id', 0);
-        $repo = new ApiKeyRepository();
+                $repo = new ApiKeyRepository();
         $row = $repo->findById($id);
         if (!$row || (int)$row['user_id'] !== (int)$user['id']) {
             Response::json(['success' => false, 'message' => '未找到或无权操作'], 403);
         }
         $repo->delete($id);
         Response::json(['success' => true, 'message' => '已删除']);
+    }
+
+    /**
+     * API 调试上传（仅登录用户，使用专用测试 Key）
+     */
+    public function debugUpload(Request $request): void
+    {
+        AuthMiddleware::handle();
+        $user = AuthService::user();
+
+        if (!csrf_check($request->post("csrf_token", ""))) {
+            Response::json(["success" => false, "message" => "会话已过期"], 400);
+        }
+
+        $file = $_FILES["file"] ?? null;
+        if (!$file || $file["error"] !== UPLOAD_ERR_OK) {
+            Response::json(["success" => false, "message" => "未收到文件或上传失败"], 400);
+        }
+
+        $compression = trim((string)$request->post("compression", ""));
+        // 从 DB 动态取 enabled=1 档位（避免硬编码漂移）
+        $validCodes = array_column(
+            Db::fetchAll('SELECT code FROM compression_profiles WHERE enabled = 1'),
+            'code'
+        );
+        if ($compression === "" || !in_array($compression, $validCodes, true)) {
+            Response::json(["success" => false, "message" => "压缩档位无效"], 400);
+        }
+
+        // 自动创建 / 获取测试 Key（专用）
+                $repo = new DebugKeyRepository();
+        $debugKey = $repo->findOrCreateDebugKey((int)$user["id"]);
+        if (!$debugKey) {
+            Response::json(["success" => false, "message" => "测试 Key 创建失败"], 500);
+        }
+
+        $sizeBefore = (int)$file["size"];
+        $opts = [
+            "compression"   => $compression,
+            "force_recompress" => 1,  // 调试必须强制重新压缩
+            "is_public"     => 0,    // 调试上传的不公开
+            "_local_file"   => true, // 内部钩子绕过 is_uploaded_file
+            "_debug_no_watermark" => 1, // 调试模式：不强制水印，让原图档真的是原图
+        ];
+
+        $svc = new UploadService();
+        $result = $svc->uploadForApi($file, (int)$user["id"], $opts, $debugKey);
+
+        if (!$result["success"]) {
+            Response::json($result, 400);
+        }
+
+        $sizeAfter = (int)($result["image"]["final_size"] ?? 0);
+        $ratio = $sizeBefore > 0 ? round($sizeBefore / max(1, $sizeAfter), 2) : 0;
+        $saved = max(0, $sizeBefore - $sizeAfter);
+
+        Response::json([
+            "success"    => true,
+            "message"    => "上传成功",
+            "image"      => $result["image"],
+            "size_before" => $sizeBefore,
+            "size_after"  => $sizeAfter,
+            "ratio"       => $ratio,
+            "saved_bytes" => $saved,
+            "compression" => $compression,
+        ]);
     }
 }

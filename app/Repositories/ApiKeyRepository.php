@@ -100,5 +100,6 @@ class ApiKeyRepository
     public function delete(int $id): int
     {
         return Db::delete('api_keys', 'id = :id', ['id' => $id]);
-    }
+}
+
 }

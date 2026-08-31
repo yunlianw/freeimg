@@ -84,9 +84,24 @@ class GdProcessor implements ImageProcessorInterface
         }
 
         // 5. 确定输出格式 + 质量
-        $ext = $opts['format'] ?? $info['extension'];
+        // output_format: webp/jpg/png/auto
+        // webp 比 JPEG 小 30%，是极限压缩的关键
+        $outFormat = (string)($opts['output_format'] ?? 'auto');
+        if ($outFormat === 'auto') {
+            $ext = $opts['format'] ?? $info['extension'];
+        } else {
+            $ext = $outFormat; // 强制 webp/jpg/png
+        }
         $mime = $this->mimeFromExt($ext);
-        $quality = max(1, min(100, (int)($opts['quality'] ?? 85)));
+        // 根据 mime 选择质量字段
+        if ($mime === 'image/webp') {
+            $quality = max(1, min(100, (int)($opts['webp_quality'] ?? $opts['quality'] ?? 85)));
+        } elseif ($mime === 'image/png') {
+            // PNG 用压缩级别（0-9），转成 imagepng 第3参
+            $quality = max(0, min(9, (int)($opts['png_compression'] ?? 6)));
+        } else {
+            $quality = max(1, min(100, (int)($opts['jpeg_quality'] ?? $opts['quality'] ?? 85)));
+        }
         $minQuality = max(1, min(100, (int)($opts['min_quality'] ?? 40)));
 
         // 6. 计算输出尺寸（实际二进制）
