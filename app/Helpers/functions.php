@@ -160,7 +160,7 @@ function site_origin(): string
         // 表不存在或 DB 异常时静默 fallback
     }
 
-    // 2. config 强制开关
+    // 2. config 强制开关（兼容老版：force_url=true 时直接用 config.app.url）
     if (config('app.force_url', false)) {
         $url = rtrim((string)config('app.url', ''), '/');
         if ($url !== '') return extract_origin($url);
@@ -216,7 +216,17 @@ function request_origin(): string
         $allowed = config('app.allowed_hosts', null);
     }
     if (is_array($allowed) && !empty($allowed) && !in_array($host, $allowed, true)) {
-        // host 不在白名单 → fallback 到 config.app.url
+        // host 不在白名单 → fallback 优先级：settings.site_url → config.app.url → localhost
+        try {
+            $siteUrl = \App\Core\Db::fetchValue(
+                "SELECT `value` FROM settings WHERE `key` = 'site_url' LIMIT 1"
+            );
+            if (is_string($siteUrl) && $siteUrl !== '') {
+                return extract_origin($siteUrl);
+            }
+        } catch (\Throwable $e) {
+            // 静默 fallback
+        }
         $fallback = rtrim((string)config('app.url', ''), '/');
         if ($fallback !== '') return extract_origin($fallback);
         $host = 'localhost';

@@ -6,9 +6,10 @@
 
 return [
     // 应用
+    // ⚠️ v1.1.7+ 「主域名」统一在后台「系统设置 → 基础设置」配置（写入 settings.site_url）
+    // 这里不再需要 url 字段，安装程序也不会再读 __SITE_URL__ 占位符
     'app' => [
         'name'           => 'FreeImg',
-        'url'            => '__SITE_URL__',
         'timezone'       => 'Asia/Shanghai',
         'debug'          => false,
         'encryption_key' => '__ENC_KEY__',
@@ -16,8 +17,9 @@ return [
         // === 多域名白名单（v1.1.8+ 可选）===
         // 适用场景：宝塔里多个站点指向同一图床目录
         // 作用：防止客户端伪造 Host 头导致 API 返回恶意域名
-        // 留空（默认）：仅信任 config.app.url（推荐单域名用户）
+        // 留空（默认）：仅信任系统设置里的主域名（settings.site_url）
         // 填写示例：['pic.5276.net', 'img.example.com', 'cdn.example.com']
+        // 优先：建议在后台「Host 白名单」直接配置（更方便，v1.1.8.1+）
         // 注意：开启后台「多域名模式」开关后必须填此项
         // 'allowed_hosts' => [],
     ],
@@ -62,7 +64,6 @@ return [
     'storage' => [
         'default'   => 'local',
         'local_path'=> __DIR__ . '/../storage/images',
-        'local_url' => '/uploads',
     ],
 
     // 日志

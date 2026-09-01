@@ -92,7 +92,7 @@ if ($step === 3 && $_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // 事务外做文件系统操作（不参与事务回滚）
             $inst->ensureDirectories($rootPath);
-            $inst->writeConfig($configFile, $_SESSION['install_db'], 'https://' . $_SERVER['HTTP_HOST']);
+            $inst->writeConfig($configFile, $_SESSION['install_db']);
             $inst->createLock($lockFile, $adminId);
             unset($_SESSION['install_db']);
 

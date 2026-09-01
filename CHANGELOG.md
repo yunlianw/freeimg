@@ -9,6 +9,31 @@ FreeImg 所有版本更新日志。
 
 ## [Unreleased]
 
+### 🧹 清理：废弃 config.app.url 与 config.storage.local_url
+
+**痛点**：config.app.url 和后台的 settings.site_url 是同一个值的重复配置，混乱。
+
+**清理**：
+- `config.app.url`：完全废弃，统一用 `settings.site_url`（后台改即可，不用动文件）
+- `config.storage.local_url`：从来没人用，删除
+- `__SITE_URL__` 占位符：移除
+- `install/Installer.php::writeConfig()` 去掉 `$siteUrl` 参数
+
+**改动**：
+- `config/config.example.php`：删除 `'url' => '__SITE_URL__'` 和 `'local_url' => '/uploads'`
+- `install/Installer.php` writeConfig 签名简化
+- `install/index.php` 调用处同步
+- `app/Helpers/functions.php` force_url 分支恢复直接读 config.app.url（虾二号指出死代码，顺手精简）
+
+**兼容性**：
+- 老库升级：现有 config.php 里残留的 url 字段不影响（仅在 force_url=true 兜底时被读）
+- 新库安装：config.php 不再含 url 字段
+- 唯一权威源：`settings.site_url`
+
+**审查**：龙虾二号 36 秒复审通过（PASS）
+
+---
+
 ### ✨ 新增：后台域名三件套（主域名 / 分享 / API）
 
 **解决痛点**：老季想换域名不用改代码文件，直接后台改。

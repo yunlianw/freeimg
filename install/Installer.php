@@ -180,7 +180,7 @@ class Installer
     /**
      * 写入 config.php
      */
-    public function writeConfig(string $configFile, array $dbCfg, string $siteUrl): string
+    public function writeConfig(string $configFile, array $dbCfg): string
     {
         $example = $rootPath = dirname(__DIR__) . '/config/config.example.php';
         if (!file_exists($example)) {
@@ -197,7 +197,7 @@ class Installer
             '__DB_USER__'  => $dbCfg['username'],
             '__DB_PASS__'  => addslashes($dbCfg['password']),
             '__ENC_KEY__'  => $encKey,
-            '__SITE_URL__' => $siteUrl,
+            // v1.1.7+ site_url 不再写入 config.php，由后台 settings.site_url 管理
         ];
         $content = strtr($content, $replacements);
         file_put_contents($configFile, $content);
