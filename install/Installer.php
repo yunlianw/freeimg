@@ -98,8 +98,9 @@ class Installer
     {
         $defaults = [
             ['site_name', 'FreeImg 自由图床', 'general'],
-            // site_url：自动用访问域名（HTTP_HOST），管理员可在后台修改
-            $publicHost ? ['site_url', 'https://' . $publicHost, 'general'] : ['site_url', '', 'general'],
+            // site_url：安装时自动用访问域名（HTTP_HOST），必填
+            // 管理员可在后台修改；share_url / api_url 留空 = 跟随 site_url
+            ['site_url', 'https://' . ($publicHost ?? 'localhost'), 'general'],
             ['upload_max_size', '10', 'upload'],
             ['upload_allowed_types', 'jpg,jpeg,png,gif,webp,bmp', 'upload'],
             ['default_compression', 'balanced', 'image'],

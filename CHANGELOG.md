@@ -9,18 +9,62 @@ FreeImg 所有版本更新日志。
 
 ## [Unreleased]
 
-### ✨ 新增：后台站点URL设置
-- **功能**：在「系统设置 → 基础设置」加「站点URL」输入框
-- **留空**：自动跟随访问域名（迁移域名不用改这里）
-- **填写**：所有 API 返回的URL、分享链接、图片直链都用这个域名（适合 CDN/多域名）
-- **优先级**：settings.site_url > config.app.force_url > 访问域名
-- **安全**：
-  - 只接受 http/https scheme（拒绝 javascript:/data:/file:/ftp）
-  - host 字符白名单 + 自动补 https://
-  - DB 异常静默 fallback
-- **安装**：自动写入 `https://{$HTTP_HOST}` 作为默认值
-- **升级**：老库升级无需操作，settings.site_url 不存在时 fallback 到访问域名
-- **审查**：龙虾二号超时，我手动 16 case 安全测试全通过
+### ✨ 新增：后台域名三件套（主域名 / 分享 / API）
+
+**解决痛点**：老季想换域名不用改代码文件，直接后台改。
+
+#### 三类域名独立可配
+
+| 字段 | 用途 | 默认行为 |
+|---|---|---|
+| `site_url`（主域名） | 基础域名，图片外链基础 | **必填**（安装时自动写入访问域名） |
+| `share_url`（分享域名） | `/s/{token}` 分享链接 | **留空 = 跟随主域名** |
+| `api_url`（API 域名） | API 接口 + 返回的图片URL | **留空 = 跟随主域名** |
+
+#### 域名优先级链
+
+```
+share_url → site_url → （无 fallback）
+api_url   → site_url → （无 fallback）
+site_url  → config.app.force_url → HTTP_HOST → localhost
+```
+
+#### 新增/修改函数
+
+- `site_origin()` / `share_origin()` / `api_origin()` — 取 origin（scheme://host:port）
+- `site_url($path)` / `share_url($path)` / `api_url($path)` — 取完整 URL
+- `extract_origin($url)` — 内部 helper，带 host 字符白名单
+- `base_origin()` / `base_url()` 保留兼容（重定向到 site_*）
+
+#### 应用点
+
+- `ShareController`：`base_url('s/...')` → `share_url('s/...')`
+- `RestApiController`：`base_url()` → `api_url()`（自描述 endpoint）
+
+#### 后台 UI 改进
+
+- 「基础设置」组**独立保存按钮**（方便只改域名不触发其他字段）
+- 底部「保存全部设置」按钮（保留原功能）
+- 主域名标红星 `*` 表示必填
+
+#### 安全校验
+
+- `extract_origin` 正则：`#^https?://[a-zA-Z0-9.\-_:]+(/.*)?$#`
+- 拒绝：`javascript:` / `data:` / `file://` / `ftp://` / 含空格 / 含 `\`
+- 恶意输入 fallback 到 `http://localhost`（不抛异常）
+- 自动补 `https://`（用户只填域名时）
+- DB 异常静默 fallback（不阻塞页面）
+
+#### 安装 / 升级
+
+- **新装**：`seedSettings($_SERVER['HTTP_HOST'])` 自动写入 site_url；share_url/api_url 默认空字符串
+- **老库升级**：`install/upgrade.php` v1.1.7 段自动 INSERT `share_url=''` / `api_url=''`（幂等）
+
+#### 审查
+
+- 龙虾二号复审：PASS（4 项关键检查全过，仅 18 秒）
+- 自测：4 case fallback链全通过
+- 11+ 安全测试：恶意输入全部 BLOCK
 
 ---
 

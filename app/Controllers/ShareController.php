@@ -87,7 +87,7 @@ class ShareController
             if (password_verify($password, (string)$folder['share_password'])) {
                 unset($_SESSION[$failKey], $_SESSION[$lockKey]);
                 $_SESSION['share_' . $token] = true;
-                Response::redirect(base_url('s/' . $token));
+                Response::redirect(share_url('s/' . $token));
             }
 
             $fails = (int)($_SESSION[$failKey] ?? 0) + 1;

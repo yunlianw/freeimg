@@ -17,13 +17,31 @@
             <input type="text" name="site_name" value="<?= htmlspecialchars($settings['site_name'] ?? 'FreeImg') ?>">
         </div>
         <div class="form-group">
-            <label>站点URL（域名）</label>
-            <input type="text" name="site_url" value="<?= htmlspecialchars($settings['site_url'] ?? '') ?>" placeholder="留空 = 跟随访问域名（如 https://pic.5276.net）">
+            <label>主域名 <span style="color:#dc2626;">*</span></label>
+            <input type="text" name="site_url" value="<?= htmlspecialchars($settings['site_url'] ?? '') ?>" placeholder="https://img.example.com" required>
             <div class="hint">
-                💡 <b>用途</b>：API 返回的图片直链、生成的URL、分享链接等都会用这个域名<br>
-                💡 <b>留空</b>：自动用用户访问的域名（推荐，迁移域名不用改这里）<br>
-                💡 <b>填写</b>：例如 <code>https://img.example.com</code>，所有外链 URL 都走这个域名（适合 CDN/多域名场景）
+                💡 <b>主域名</b>：所有图片外链、API 接口、分享链接的基础<br>
+                💡 <b>安装时自动写入</b>访问域名，后期修改直接在这里改 → 全部自动跟随
             </div>
+        </div>
+        <div class="form-group">
+            <label>分享域名 <span style="color:#999;font-weight:normal;">（选填）</span></label>
+            <input type="text" name="share_url" value="<?= htmlspecialchars($settings['share_url'] ?? '') ?>" placeholder="留空 = 跟随主域名">
+            <div class="hint">
+                💡 用于 <code>/s/{token}</code> 分享链接，例：<code>https://share.example.com</code><br>
+                💡 <b>留空</b> = 跟随主域名（推荐，迁移域名不用改这里）
+            </div>
+        </div>
+        <div class="form-group">
+            <label>API 域名 <span style="color:#999;font-weight:normal;">（选填）</span></label>
+            <input type="text" name="api_url" value="<?= htmlspecialchars($settings['api_url'] ?? '') ?>" placeholder="留空 = 跟随主域名">
+            <div class="hint">
+                💡 用于 API 接口自描述 + API 返回的图片URL字段，例：<code>https://api.example.com</code><br>
+                💡 <b>留空</b> = 跟随主域名（推荐，迁移域名不用改这里）
+            </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px;">
+            <button type="submit" name="submit_section" value="basic" class="btn-primary">💾 保存基础设置</button>
         </div>
     </div>
 
@@ -233,7 +251,7 @@
     </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn-primary">💾 保存设置</button>
+        <button type="submit" name="submit_section" value="all" class="btn-primary">💾 保存全部设置</button>
     </div>
 </form>
 <script>

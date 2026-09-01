@@ -114,64 +114,116 @@ function current_url(): string
  * 当前请求的 origin（scheme + host，无 path）
  * 例：https://pic.5276.net
  * 优先级：
- *   1. settings.site_url（后台可设置，覆盖访问域名）
- *   2. config 强制开关 app.force_url + app.url
+ *   1. settings.site_url（后台可设置，必填，安装时自动写入访问域名）
+ *   2. config.app.force_url + app.url
  *   3. 当前请求的 host（动态）
  *   4. localhost 兜底
+ *
+ * 注意：site_url 安装时必写访问域名，老用户后台可改；没有"留空=访问域名"的语义。
  */
 function base_origin(): string
 {
-    // 0. 优先读 settings 表 site_url（后台可改）
+    return site_origin();
+}
+
+/**
+ * 主域名 origin（settings.site_url 优先）
+ */
+function site_origin(): string
+{
+    // 1. settings.site_url（后台可改，安装时自动写入）
     try {
         $siteUrl = \App\Core\Db::fetchValue(
             "SELECT `value` FROM settings WHERE `key` = 'site_url' LIMIT 1"
         );
         if (is_string($siteUrl) && $siteUrl !== '') {
-            $clean = rtrim($siteUrl, '/');
-            if (preg_match('#^https?://[a-zA-Z0-9.\-_:]+(/.*)?$#', $clean)) {
-                // 只取 origin（去掉 path）
-                $parts = parse_url($clean);
-                $origin = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
-                if (isset($parts['port'])) $origin .= ':' . $parts['port'];
-                if ($origin !== '://') return $origin;
-            }
+            return extract_origin($siteUrl);
         }
     } catch (\Throwable $e) {
-        // 表不存在或 DB 异常时静默 fallback（兼容安装前）
+        // 表不存在或 DB 异常时静默 fallback
     }
 
-    // 1. config 强制开关（生产/CDN 推荐）
+    // 2. config 强制开关
     if (config('app.force_url', false)) {
-        return rtrim((string)config('app.url', ''), '/');
+        $url = rtrim((string)config('app.url', ''), '/');
+        if ($url !== '') return extract_origin($url);
     }
-    // 2. 当前请求的 host（动态）
+
+    // 3. 当前请求的 host
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    // 反代转发：X-Forwarded-Proto 白名单（防止 header 注入型 XSS）
     if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
         $forwarded = strtolower(trim((string)$_SERVER['HTTP_X_FORWARDED_PROTO']));
-        // 多值取首段（防逗号串联）
         $first = explode(',', $forwarded, 2)[0] ?? '';
         $first = trim($first);
         if ($first === 'https' || $first === 'http') {
             $scheme = $first;
         }
     }
-    // host：优先用 X-Forwarded-Host（CDN/反代场景），取首段 + 域名白名单
     $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? ($_SERVER['HTTP_HOST'] ?? 'localhost');
-    // 多值取首段（逗号分隔，如 "a.com, b.com"）
     $host = trim(explode(',', $host, 2)[0] ?? '');
-    // config 可配置 allowed_hosts 白名单（生产推荐）
     $allowed = config('app.allowed_hosts', null);
     if (is_array($allowed) && !empty($allowed) && !in_array($host, $allowed, true)) {
-        // host 不在白名单时 fallback 到 config.app.url
         $fallback = rtrim((string)config('app.url', ''), '/');
-        if ($fallback !== '') return $fallback;
+        if ($fallback !== '') return extract_origin($fallback);
         $host = 'localhost';
     }
-    // host 字符白名单（防注入）
     $host = preg_replace('/[^a-zA-Z0-9.\-:_]/', '', $host);
     if ($host === '') $host = 'localhost';
     return $scheme . '://' . $host;
+}
+
+/**
+ * 分享域名 origin
+ * 优先级：settings.share_url → site_origin
+ */
+function share_origin(): string
+{
+    try {
+        $url = \App\Core\Db::fetchValue(
+            "SELECT `value` FROM settings WHERE `key` = 'share_url' LIMIT 1"
+        );
+        if (is_string($url) && $url !== '') {
+            return extract_origin($url);
+        }
+    } catch (\Throwable $e) {
+        // 静默 fallback
+    }
+    return site_origin();
+}
+
+/**
+ * API 域名 origin
+ * 优先级：settings.api_url → site_origin
+ */
+function api_origin(): string
+{
+    try {
+        $url = \App\Core\Db::fetchValue(
+            "SELECT `value` FROM settings WHERE `key` = 'api_url' LIMIT 1"
+        );
+        if (is_string($url) && $url !== '') {
+            return extract_origin($url);
+        }
+    } catch (\Throwable $e) {
+        // 静默 fallback
+    }
+    return site_origin();
+}
+
+/**
+ * 从完整 URL 中提取 origin（scheme://host:port）
+ * 带 host 字符白名单，防止恶意输入
+ */
+function extract_origin(string $url): string
+{
+    $url = trim($url);
+    if (!preg_match('#^https?://[a-zA-Z0-9.\-_:]+(/.*)?$#', $url)) {
+        return 'http://localhost';
+    }
+    $parts = parse_url($url);
+    $origin = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
+    if (isset($parts['port'])) $origin .= ':' . $parts['port'];
+    return $origin !== '://' ? $origin : 'http://localhost';
 }
 
 /**
@@ -182,6 +234,33 @@ function base_url(string $path = ''): string
 {
     $base = base_origin();
     return $base . '/' . ltrim($path, '/');
+}
+
+/**
+ * 主域名 URL（用于图片外链等基础 URL 生成）
+ * 等价于 base_url，但语义更清晰
+ */
+function site_url(string $path = ''): string
+{
+    return site_origin() . '/' . ltrim($path, '/');
+}
+
+/**
+ * 分享域名 URL（用于 /s/{token} 分享链接）
+ * 优先级：share_origin() = settings.share_url → site_origin
+ */
+function share_url(string $path = ''): string
+{
+    return share_origin() . '/' . ltrim($path, '/');
+}
+
+/**
+ * API 域名 URL（用于 API 接口自描述 + 返回的图片 URL）
+ * 优先级：api_origin() = settings.api_url → site_origin
+ */
+function api_url(string $path = ''): string
+{
+    return api_origin() . '/' . ltrim($path, '/');
 }
 
 /**

@@ -33,7 +33,7 @@ class RestApiController
      */
     public function uploadInfo(Request $request): void
     {
-        $endpoint = rtrim(base_url(), '/') . '/api/v1/upload';
+        $endpoint = rtrim(api_url(), '/') . '/api/v1/upload';
         Response::json([
             'service'      => 'FreeImg API',
             'endpoint'     => $endpoint,

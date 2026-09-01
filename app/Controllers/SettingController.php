@@ -25,9 +25,17 @@ class SettingController
             Response::redirect(base_url('settings'));
         }
 
-        $allowed = [
+        // 判断提交的是哪个区块（不同按钮 → 不同 allowed 列表）
+        $submitSection = (string)$request->post('submit_section', 'all');
+
+        // 基础设置（站点名称、主域名、分享域名、API域名） — 独立保存
+        $basicOnly = ['site_name', 'site_url', 'share_url', 'api_url'];
+
+        $allowed = $submitSection === 'basic' ? $basicOnly : [
             'site_name',
-            'site_url',                              // 站点域名（后台可改）
+            'site_url',                              // 主域名（后台可改）
+            'share_url',                             // 分享域名（留空跟随主域名）
+            'api_url',                               // API 域名（留空跟随主域名）
             'upload_max_size', 'upload_allowed_types',
             'default_compression',
             'strip_exif',
@@ -76,17 +84,29 @@ class SettingController
 
             // 站点 URL 校验：必须是合法 http(s) URL，host 字符白名单
             if ($key === 'site_url') {
+                // 主域名必填，不允许空
                 if ($value === '') {
-                    // 空 = 跟随访问域名
-                    $value = '';
-                } else {
-                    // 自动补 https://（用户只填域名时）
+                    flash('error', '主域名不能为空（安装时已自动写入，如要修改请填新域名）');
+                    Response::redirect(base_url('settings'));
+                }
+                if (!preg_match('#^https?://#i', $value)) {
+                    $value = 'https://' . $value;
+                }
+                $value = rtrim($value, '/');
+                if (!preg_match('#^https?://[a-zA-Z0-9.\-_:]+(/.*)?$#', $value)) {
+                    flash('error', '主域名格式不正确（例：https://img.example.com）');
+                    Response::redirect(base_url('settings'));
+                }
+            }
+            // 分享 URL / API URL：留空 = 跟随主域名
+            if ($key === 'share_url' || $key === 'api_url') {
+                if ($value !== '') {
                     if (!preg_match('#^https?://#i', $value)) {
                         $value = 'https://' . $value;
                     }
                     $value = rtrim($value, '/');
                     if (!preg_match('#^https?://[a-zA-Z0-9.\-_:]+(/.*)?$#', $value)) {
-                        flash('error', '站点URL格式不正确（例：https://img.example.com）');
+                        flash('error', ($key === 'share_url' ? '分享' : 'API') . '域名格式不正确（例：https://' . ($key === 'share_url' ? 'share' : 'api') . '.example.com，留空则跟随主域名）');
                         Response::redirect(base_url('settings'));
                     }
                 }

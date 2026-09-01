@@ -2,7 +2,7 @@
 /**
  * FreeImg 升级脚本（自动随 install/Installer 触发）
  *
- * 当前版本：v1.1.4-alpha
+ * 当前版本：v1.1.7
  * - 清理 v1.1.3 残留的孤儿 settings 行（site_description/default_storage/allow_signup/maintenance_mode）
  * - 幂等：可重复运行，已清理的 key 不会报错
  *
@@ -59,6 +59,25 @@ try {
     }
 } catch (Throwable $e) {
     // 表不存在 → 跳过
+}
+
+// v1.1.7: 后台域名三件套（site_url / share_url / api_url）
+// 升级路径：老库可能没有 share_url / api_url 行，需要 INSERT 空值让前端可编辑
+// 幂等：已存在则跳过
+foreach ([
+    ['share_url', ''],
+    ['api_url', ''],
+] as [$key, $default]) {
+    try {
+        $check = $pdo->prepare('SELECT COUNT(*) FROM settings WHERE `key` = :k');
+        $check->execute([':k' => $key]);
+        if ((int)$check->fetchColumn() === 0) {
+            $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES (:k, :v, 'general', NOW())");
+            $ins->execute([':k' => $key, ':v' => $default]);
+        }
+    } catch (Throwable $e) {
+        // 静默跳过
+    }
 }
 
 // 记录升级日志（可选）
