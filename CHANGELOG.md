@@ -9,6 +9,44 @@ FreeImg 所有版本更新日志。
 
 ## [Unreleased]
 
+### 🧹 重大清理：config 大幅精简 + 域名生成 URL BUG 修复
+
+#### 🧹 config 精简
+
+删除所有"程序里完全没人用"的 config 字段（14 个字段 / 3 整节）：
+
+| 节 | 删除 | 保留 |
+|---|---|---|
+| app | name | url/timezone/debug/encryption_key |
+| database | collation | host/port/dbname/username/password/charset |
+| session | cookie_httponly / cookie_samesite（硬编码）| name/lifetime/cookie_secure |
+| upload | allowed_types（用 settings）/ chunk_size | max_size / max_pixels |
+| image | **整节删除** | — |
+| storage | **整节删除** | — |
+| log | **整节删除** | — |
+
+**审查**：龙虾二号 48 秒复审 PASS，老库升级无影响（多余键不被读），新库安装无 null 错误（全部 `??` 兜底）
+
+#### 🐛 域名生成 URL BUG 修复
+
+**症状**：老季后台设了 share_url=https://2025dns.cn，但相册分享链接仍是 pic.5276.net
+
+**根因**：3 处 controller + 2 处 view 用 `base_url()` 生成应该用 `share_url()` / `api_url()` 的 URL
+
+**修复**：
+
+| 文件 | 行 | 之前 | 修复 |
+|---|---|---|---|
+| `AlbumController.php` | 195 | `base_url('s/' . $token)` | `share_url('s/' . $token)` |
+| `views/share/image.php` | 5 | `'https://' . $_SERVER['HTTP_HOST']` | `share_url('s/img/' . ...)` |
+| `views/share/folder.php` | 6 | `'https://' . $_SERVER['HTTP_HOST']` | `share_url('s/' . ...)` |
+| `views/api_keys/index.php` | 262 | `base_url('api/v1/upload')` 给用户看 | `api_url('api/v1/upload')` |
+| `views/api_keys/index.php` | 287 | `$apiBaseUrl = rtrim(base_url(), '/')` | `rtrim(api_url(), '/')` |
+
+**说明**：站内跳转（`Response::redirect(base_url('albums'))`）保持用 `base_url()`（跟随当前域名，符合直觉）
+
+---
+
 ### 🧹 清理：废弃 config.app.url 与 config.storage.local_url
 
 **痛点**：config.app.url 和后台的 settings.site_url 是同一个值的重复配置，混乱。

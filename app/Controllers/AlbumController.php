@@ -192,7 +192,7 @@ class AlbumController
             $fail('保存分享失败，请重试');
         }
 
-        $shareUrl = base_url('s/' . $token);
+        $shareUrl = share_url('s/' . $token);
         if ($isAjax) {
             Response::json([
                 'success'    => true,

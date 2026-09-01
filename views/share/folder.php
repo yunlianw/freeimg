@@ -2,8 +2,8 @@
 /** @var array $folder */
 /** @var array $list */
 $title = $folder['name'];
-$host = $_SERVER['HTTP_HOST'] ?? 'yourdomain.com';
-$canonical = 'https://' . $host . '/s/' . urlencode($folder['share_token']);
+// v1.1.9: 用 share_url() 替换硬编码的 HTTP_HOST 拼接
+$canonical = share_url('s/' . urlencode($folder['share_token']));
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">

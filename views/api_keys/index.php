@@ -259,7 +259,7 @@
     <div class="security-banner-body">
         <strong>API 接口安全提示</strong>
         <ul>
-            <li><strong>API endpoint 是永久地址</strong>：<code class="endpoint-code"><?= htmlspecialchars(base_url('api/v1/upload')) ?></code> 请勿对外公开</li>
+            <li><strong>API endpoint 是永久地址</strong>：<code class="endpoint-code"><?= htmlspecialchars(api_url('api/v1/upload')) ?></code> 请勿对外公开</li>
             <li><strong>Access Key + Secret Key 等同于账号密码</strong>，泄露 = 别人可上传/消耗你的存储</li>
             <li><strong>建议</strong>：每个调用方建独立 Key，泄露可单独撤销不影响其他</li>
             <li><strong>定期轮换</strong>：怀疑泄露立即删除旧 Key 并重建</li>
@@ -284,7 +284,7 @@
 </div>
 
 <?php
-$apiBaseUrl = rtrim(base_url(), '/');
+$apiBaseUrl = rtrim(api_url(), '/');
 // 过滤 __debug__ 专用 Key（不计入用户可见统计）
 $visibleKeys = array_filter($keys, fn($k) => ($k['name'] ?? '') !== '__debug__');
 $totalKeys = count($visibleKeys);

@@ -1,8 +1,7 @@
 <?php
 /** @var array $image */
 $title = $image['original_name'];
-$host = $_SERVER['HTTP_HOST'] ?? 'yourdomain.com';
-$shareUrl = 'https://' . $host . '/s/img/' . urlencode($image['uuid']);
+// v1.1.9.1: 移除死代码 \$shareUrl（页面用 \$image['public_url'] 作为 OG tag）
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
