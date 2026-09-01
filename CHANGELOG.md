@@ -68,6 +68,47 @@ site_url  → config.app.force_url → HTTP_HOST → localhost
 
 ---
 
+## [v1.1.8] - 2026-09-01
+
+### ✨ 新增：多域名模式开关（url_follow_host）
+
+**痛点**：老季在宝塔里建 5 个站点指向同一图床目录，5 个域名都能访问，但 API 返回的链接、分享链接都是固定的 site_url，5 个域名访问时拿到的是同一个链接。
+
+**方案**：单开关设计（龙虾二号方案，三开关方案被否决为过度设计）
+
+#### 新增字段
+
+`settings.url_follow_host`（默认 '0'）：
+
+- `= '0'`（默认）：v1.1.7 行为不变（用 site_url / share_url / api_url 配置）
+- `= '1'`：跳过 site_url/share_url/api_url 写死值，URL 跟随访问域名
+
+#### 行为对比
+
+| 模式 | 访问 pic.5276.net | 访问 img.xxx.com | 自定义 api_url |
+|---|---|---|---|
+| 默认（0）| pic.5276.net | pic.5276.net | api.zzz.com |
+| 多域名（1）| pic.5276.net | **img.xxx.com** | api.zzz.com（独立）|
+
+#### 安全
+
+- 复用现有 `config.app.allowed_hosts` 白名单校验
+- host 字符白名单清洗（防注入）
+- 开启多域名模式 **必须** 在 `config/config.php` 配置 `allowed_hosts`，否则攻击者构造 Host 头 → API 返回恶意域名
+
+#### UI
+
+设置页基础设置组加 checkbox：「多域名模式：URL 跟随访问域名」+ 警告 + 必配 allowed_hosts 提示
+
+#### 实现
+
+- `site_origin()` 加 url_follow_host 分支（与现有"请求 host 兜底"合并，不重复代码）
+- `share_origin()` / `api_origin()`：**一行不改**（留空已跟随 site_origin）
+- SettingController 加 checkbox 处理（取消勾选时存 '0' 而非空字符串）
+- upgrade.php 升级路径：INSERT 默认 '0'（幂等）
+
+---
+
 ## [v1.1.6] - 2026-09-01
 
 **修复**：腾讯云 COS 存储驱动（核心 Bug，已影响所有 COS 用户）+ SFTP 教程底部遮挡

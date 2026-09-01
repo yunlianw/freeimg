@@ -40,6 +40,24 @@
                 💡 <b>留空</b> = 跟随主域名（推荐，迁移域名不用改这里）
             </div>
         </div>
+        <div class="form-group">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal;">
+                <input type="checkbox" name="url_follow_host" value="1" <?= ($settings['url_follow_host'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <b>多域名模式：URL 跟随访问域名</b>
+            </label>
+            <div class="hint">
+                💡 开启后：API 返回的图片URL、分享链接都使用访客当前访问的域名（适合宝塔里多个站点指向同一图床目录）<br>
+                ⚠️ <b>必须同时</b>在 <code>config/config.php</code> 的 <code>app.allowed_hosts</code> 填入所有合法域名（防 Host 头伪造）<br>
+                💡 关闭时（默认）：API/分享链接用上面填的「主域名/分享/API 域名」（推荐单域名场景）
+            </div>
+            <?php if (($settings['url_follow_host'] ?? '0') === '1' && empty(config('app.allowed_hosts'))): ?>
+                <div style="margin-top:8px; padding:10px 14px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:4px; color:#92400e; font-size:13px;">
+                    ⚠️ <b>未配置 allowed_hosts 白名单！</b> 多域名模式已开启但 config 里没填白名单，当前会信任任意 Host 头（存在安全风险）。<br>
+                    请在 <code>config/config.php</code> 的 <code>app</code> 节加：<br>
+                    <code style="display:block; margin-top:4px; padding:4px 8px; background:#fff;'allowed_hosts' =&gt; ['pic.5276.net', 'img.xxx.com'],</code>
+                </div>
+            <?php endif; ?>
+        </div>
         <div style="display:flex; gap:8px; margin-top:12px;">
             <button type="submit" name="submit_section" value="basic" class="btn-primary">💾 保存基础设置</button>
         </div>

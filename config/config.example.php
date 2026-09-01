@@ -12,6 +12,14 @@ return [
         'timezone'       => 'Asia/Shanghai',
         'debug'          => false,
         'encryption_key' => '__ENC_KEY__',
+
+        // === 多域名白名单（v1.1.8+ 可选）===
+        // 适用场景：宝塔里多个站点指向同一图床目录
+        // 作用：防止客户端伪造 Host 头导致 API 返回恶意域名
+        // 留空（默认）：仅信任 config.app.url（推荐单域名用户）
+        // 填写示例：['pic.5276.net', 'img.example.com', 'cdn.example.com']
+        // 注意：开启后台「多域名模式」开关后必须填此项
+        // 'allowed_hosts' => [],
     ],
 
     // 数据库

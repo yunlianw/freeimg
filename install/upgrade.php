@@ -2,7 +2,7 @@
 /**
  * FreeImg 升级脚本（自动随 install/Installer 触发）
  *
- * 当前版本：v1.1.7
+ * 当前版本：v1.1.8
  * - 清理 v1.1.3 残留的孤儿 settings 行（site_description/default_storage/allow_signup/maintenance_mode）
  * - 幂等：可重复运行，已清理的 key 不会报错
  *
@@ -78,6 +78,19 @@ foreach ([
     } catch (Throwable $e) {
         // 静默跳过
     }
+}
+
+// v1.1.8: 多域名模式开关（url_follow_host，默认 0 = 走 site_url）
+// 老库升级：INSERT 默认 '0'，行为不变
+try {
+    $check = $pdo->prepare('SELECT COUNT(*) FROM settings WHERE `key` = :k');
+    $check->execute([':k' => 'url_follow_host']);
+    if ((int)$check->fetchColumn() === 0) {
+        $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES ('url_follow_host', '0', 'general', NOW())");
+        $ins->execute();
+    }
+} catch (Throwable $e) {
+    // 静默跳过
 }
 
 // 记录升级日志（可选）

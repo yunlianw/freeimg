@@ -36,6 +36,7 @@ class SettingController
             'site_url',                              // 主域名（后台可改）
             'share_url',                             // 分享域名（留空跟随主域名）
             'api_url',                               // API 域名（留空跟随主域名）
+            'url_follow_host',                       // 多域名模式开关（checkbox）
             'upload_max_size', 'upload_allowed_types',
             'default_compression',
             'strip_exif',
@@ -81,6 +82,11 @@ class SettingController
 
         foreach ($allowed as $key) {
             $value = trim((string)$request->post($key, ''));
+
+            // checkbox 字段（不勾时 HTML 表单不提交，需要显式存 '0'）
+            if (in_array($key, ['url_follow_host', 'strip_exif', 'watermark_enabled', 'image_watermark_enabled'], true)) {
+                $value = $value === '1' ? '1' : '0';
+            }
 
             // 站点 URL 校验：必须是合法 http(s) URL，host 字符白名单
             if ($key === 'site_url') {

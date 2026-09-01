@@ -128,9 +128,26 @@ function base_origin(): string
 
 /**
  * 主域名 origin（settings.site_url 优先）
+ *
+ * 多域名模式开关 settings.url_follow_host：
+ *   '0'（默认）：完全走 settings.site_url → config.app.force_url → HTTP_HOST → localhost
+ *   '1'        ：跳过 site_url，直接走请求 host 兜底（适合多域名指向同一目录场景）
+ *                注意：开启此模式必须配合 config.app.allowed_hosts 白名单，否则 HTTP_HOST 可被伪造
  */
 function site_origin(): string
 {
+    // 多域名模式：跳过 settings.site_url，直接走请求 host（复用 request_origin 安全网）
+    try {
+        $followHost = \App\Core\Db::fetchValue(
+            "SELECT `value` FROM settings WHERE `key` = 'url_follow_host' LIMIT 1"
+        );
+        if ($followHost === '1') {
+            return request_origin();
+        }
+    } catch (\Throwable $e) {
+        // 静默 fallback
+    }
+
     // 1. settings.site_url（后台可改，安装时自动写入）
     try {
         $siteUrl = \App\Core\Db::fetchValue(
@@ -150,7 +167,17 @@ function site_origin(): string
     }
 
     // 3. 当前请求的 host
+    return request_origin();
+}
+
+/**
+ * 从当前请求中提取 origin（带 host 白名单 + 字符清洗）
+ * 单独抽出供 site_origin() 在多域名模式和默认 fallback 复用
+ */
+function request_origin(): string
+{
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    // 反代转发：X-Forwarded-Proto 白名单（防 header 注入）
     if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
         $forwarded = strtolower(trim((string)$_SERVER['HTTP_X_FORWARDED_PROTO']));
         $first = explode(',', $forwarded, 2)[0] ?? '';
@@ -159,14 +186,18 @@ function site_origin(): string
             $scheme = $first;
         }
     }
+    // host：优先 X-Forwarded-Host（CDN/反代场景）
     $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? ($_SERVER['HTTP_HOST'] ?? 'localhost');
     $host = trim(explode(',', $host, 2)[0] ?? '');
+    // 白名单校验（多域名模式必须配）
     $allowed = config('app.allowed_hosts', null);
     if (is_array($allowed) && !empty($allowed) && !in_array($host, $allowed, true)) {
+        // host 不在白名单 → fallback 到 config.app.url
         $fallback = rtrim((string)config('app.url', ''), '/');
         if ($fallback !== '') return extract_origin($fallback);
         $host = 'localhost';
     }
+    // host 字符白名单（防注入）
     $host = preg_replace('/[^a-zA-Z0-9.\-:_]/', '', $host);
     if ($host === '') $host = 'localhost';
     return $scheme . '://' . $host;
