@@ -11,6 +11,33 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.3.1] - 2026-09-02
+
+### 🧹 清理：彻底删除 config.app.url / config.app.force_url
+
+**背景**：v1.1.8.2 已经废弃 config.app.url，example 模板也不再写。但代码里还有 2 处兜底读 config.app.url（force_url=true 分支 + 恶意 host fallback）。本次彻底清理。
+
+**改动**：
+- `app/Helpers/functions.php`
+  - L165 force_url=true 分支删除
+  - L230 恶意 host fallback 删除 config.app.url 那行
+  - 文档注释更新（去掉 config.app.force_url + app.url 描述）
+- `views/settings/index.php`
+  - Host 白名单提示文案更新（不再提 config.app.url）
+
+**顺手修隐患**：本服务器 config.php 里 `app.url=https://pic.527.net`（**陈旧错误域名**）。删除读取后不再生效，**杜绝「旧配置生成错误链接」**。
+
+**兜底**：
+- 老库 config.php 残留 app.url 字段 → 无害（PHP数组多键）
+- 删 force_url 分支后 admin 故意开 force_url → fallback 到 request_origin()（行为中性）
+- 删恶意 host fallback 后 host 不在白名单 + site_url 空 → fallback localhost（更安全）
+
+**审查**：龙虾二号 51 秒复审 PASS
+
+---
+
+---
+
 ## [v1.3.0] - 2026-09-02
 
 ### ✨ 新增：最大并发会话数限制（多端登录）

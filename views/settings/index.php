@@ -62,9 +62,9 @@
             <textarea name="allowed_hosts" rows="4" placeholder="pic.5276.net&#10;img.example.com&#10;cdn.example.com"><?= htmlspecialchars($settings['allowed_hosts'] ?? '') ?></textarea>
             <div class="hint">
                 💡 <b>多域名模式必填</b>：宝塔多个站点指向同一图床时，必须把所有合法域名都列上（防 Host 头伪造）<br>
-                💡 <b>留空</b>：仅信任 config.app.url（推荐单域名用户，多域名用户必须填）<br>
+                💡 <b>留空</b>：信任任意请求 Host（仅做字符清洗，不做白名单校验 — 多域名用户必填）<br>
                 💡 <b>格式</b>：每行一个域名，自动补 <code>https://</code>（也可直接写完整 URL）<br>
-                💡 <b>兼容</b>：config/config.php 的 <code>app.allowed_hosts</code> 仍生效（后台优先）
+                💡 <b>兼容</b>：config/config.php 的 <code>app.allowed_hosts</code> 仍生效（后台优先，v1.3.1 起不推荐）
             </div>
         </div>
         <div style="display:flex; gap:8px; margin-top:12px;">

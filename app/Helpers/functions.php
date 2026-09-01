@@ -115,8 +115,7 @@ function current_url(): string
  * 例：https://pic.5276.net
  * 优先级：
  *   1. settings.site_url（后台可设置，必填，安装时自动写入访问域名）
- *   2. config.app.force_url + app.url
- *   3. 当前请求的 host（动态）
+ *   2. 当前请求的 host（动态）
  *   4. localhost 兜底
  *
  * 注意：site_url 安装时必写访问域名，老用户后台可改；没有"留空=访问域名"的语义。
@@ -129,10 +128,13 @@ function base_origin(): string
 /**
  * 主域名 origin（settings.site_url 优先）
  *
- * 多域名模式开关 settings.url_follow_host：
- *   '0'（默认）：完全走 settings.site_url → config.app.force_url → HTTP_HOST → localhost
- *   '1'        ：跳过 site_url，直接走请求 host 兜底（适合多域名指向同一目录场景）
- *                注意：开启此模式必须配合 config.app.allowed_hosts 白名单，否则 HTTP_HOST 可被伪造
+ * 优先级：
+ *   1. settings.site_url（后台「基础设置 → 主域名」必填字段，安装时自动写入访问域名）
+ *   2. 当前请求的 host（带 host 白名单 + 字符清洗）
+ *   3. localhost 兜底
+ *
+ * v1.3.1：彻底移除 config.app.url / config.app.force_url 支持
+ *        — settings.site_url 已完全接管，且后台可改，无需保留兜底
  */
 function site_origin(): string
 {
@@ -160,13 +162,7 @@ function site_origin(): string
         // 表不存在或 DB 异常时静默 fallback
     }
 
-    // 2. config 强制开关（兼容老版：force_url=true 时直接用 config.app.url）
-    if (config('app.force_url', false)) {
-        $url = rtrim((string)config('app.url', ''), '/');
-        if ($url !== '') return extract_origin($url);
-    }
-
-    // 3. 当前请求的 host
+    // 2. 当前请求的 host
     return request_origin();
 }
 
@@ -216,7 +212,7 @@ function request_origin(): string
         $allowed = config('app.allowed_hosts', null);
     }
     if (is_array($allowed) && !empty($allowed) && !in_array($host, $allowed, true)) {
-        // host 不在白名单 → fallback 优先级：settings.site_url → config.app.url → localhost
+        // host 不在白名单 → fallback 优先级：settings.site_url → localhost
         try {
             $siteUrl = \App\Core\Db::fetchValue(
                 "SELECT `value` FROM settings WHERE `key` = 'site_url' LIMIT 1"
@@ -227,8 +223,6 @@ function request_origin(): string
         } catch (\Throwable $e) {
             // 静默 fallback
         }
-        $fallback = rtrim((string)config('app.url', ''), '/');
-        if ($fallback !== '') return extract_origin($fallback);
         $host = 'localhost';
     }
     // host 字符白名单（防注入）
