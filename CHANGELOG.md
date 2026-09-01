@@ -11,6 +11,56 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.1.6] - 2026-09-01
+
+**修复**：腾讯云 COS 存储驱动（核心 Bug，已影响所有 COS 用户）+ SFTP 教程底部遮挡
+
+### 🐛 严重 Bug 修复：腾讯云 COS 签名
+
+（详见下方 v1.1.6-COS 部分）
+
+### 🐛 SFTP 教程底部被遮挡修复
+- **症状**：在「添加存储 → SFTP」页面，「SFTP 小白教程」折叠面板里底部内容看不到
+- **根因**：教程区域误用了 `config-collapse-wrapper` 类，该类 CSS（`public/assets/style.css` L549-555）强制 `max-height: 800px + overflow: hidden`（这是给上传区折叠配置设计的），套到教程上把超出 800px 的内容全部截断
+- **修复**：教程外层类名改为 `sftp-tutorial`（自定义无 CSS 类），高度由内容决定
+- **审查**：龙虾二号 11/11 断言通过 + 375px 手机端验证 OK
+
+---
+
+- **症状**：用户使用 COS 存储时，「测试连接」一直失败，但密钥/区域都正确；华为云 OBS 同样代码结构正常
+- **根因**：原代码误用 **TC3-HMAC-SHA256** 算法（腾讯云 API 3.0 JSON API 的签名），嫁接到 COS XML API（走 `x-amz-*` 头 + `myqcloud.com` 桶域名）上。COS XML API 只认 `q-sign-algorithm=sha1`，网关返回 400/403 → testConnection 失败
+- **影响范围**：所有通过 COS 存储的图片上传/读取/删除全挂
+- **修复**：
+  - 整段重写 `signedHeaders()` 方法，改用腾讯云官方 **q-sign-algorithm=sha1** 算法
+  - 删除过期的 `x-amz-content-sha256` / `x-amz-date` 头
+  - StringToSign 恢复标准 3 行格式（`sha1\nKeyTime\nSHA1(HttpString)\n`）
+  - Authorization 头改为官方标准 URL 参数拼接（`q-sign-algorithm&q-ak&q-sign-time&q-key-time&q-header-list&q-url-param-list&q-signature`）
+- **佐证**：全网搜 `"TC3-HMAC-SHA256" + COS + x-amz-date` 零结果，没有任何真实实现这么写
+- **文档**：对照官方文档 https://cloud.tencent.com/document/product/436/7778 逐项实现并复审
+- **实测**：使用真实密钥（id=13 腾讯桶）实测 testConnection + 上传 + 读取 + 删除全链路通过
+
+### 🐛 次要 Bug 修复
+
+**PUT 上传 Content-Type 错误**
+- **症状**：上传图片后，对象 MIME 是 `application/x-www-form-urlencoded`（curl 默认），不是 `image/png` → 图床直链显示异常
+- **修复**：put() 显式设置 `Content-Type`，按扩展名猜 mime（jpg/png/gif/webp/mp4 等），新增 `guessMime()` 方法
+- **关键**：Content-Type 不入 q-header-list 签名（COS 只强制签 host）
+
+**UriPathname URL 编码处理不当**
+- **症状**：中文/空格文件名上传 403 SignatureDoesNotMatch
+- **根因**：COS 服务端会把请求行 URL-decode 后与签名的**原始路径**比对；签名里做 RFC3986 编码反而错位
+- **修复**：签名 UriPathname 保留原始未编码路径，URL 单独走 `encodeUrlPath()`（RFC3986 保留 `/`）
+- **实测**：中文路径 `/测试路径-cos-mime.png`、空格路径 `/my file-cos-mime.png` 都 ✅
+
+### 📝 经验教训
+
+- ⚠️ 腾讯云有 **两套独立签名体系**：API 3.0 JSON API 用 TC3-HMAC-SHA256（`X-TC-*` 头），XML API 用 q-sign-algorithm=sha1（`q-*-*` 头），**绝对不能混用**
+- ⚠️ 看到 `TC3-HMAC-SHA256` + `x-amz-*` 头组合 = 100% 错误
+- ⚠️ 龙虾二号用真实密钥实测才暴露问题（不只是代码审查，是真实调用验证）
+- ⚠️ 改完代码没有马上汇报、回复用户说自己干完了 → 被骂，下次必须边干边汇报
+
+---
+
 ## [v1.1.5] - 2026-08-31
 
 **新增**：mega 档 13KB（追平/超越浏览器）、API 调试工具、图片批量全选。

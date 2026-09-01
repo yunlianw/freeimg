@@ -243,6 +243,17 @@ class StorageManager
      * 真实探测驱动：返回精确诊断
      * 优先用测试文件上传再删除，避免和 ListBucket 等无关 ACL 冲突
      */
+    private static function lastDetail($instance): string
+    {
+        if (!method_exists($instance, 'getLastResponse')) return '';
+        $resp = $instance->getLastResponse();
+        if ($resp === null) return '';
+        return sprintf(' [HTTP %d] %s',
+            $resp['code'] ?? 0,
+            substr((string)($resp['body'] ?? ''), 0, 150)
+        );
+    }
+
     private static function probeConfig(string $driver, $instance): array
     {
         // 用一个 probe 测试：上传→读取→删除
@@ -253,28 +264,31 @@ class StorageManager
             // 1) 探测桶存在（testConnection 走 HEAD 根，多数驱动都是 GET 探测，绕开 ListBucket 限制）
             $connectOk = $instance->testConnection();
             if (!$connectOk) {
+                $lastDetail = self::lastDetail($instance);
                 return [
                     'ok' => false,
-                    'message' => self::diagnose($driver, 'connect_fail', ''),
+                    'message' => self::diagnose($driver, 'connect_fail', '') . $lastDetail,
                 ];
             }
 
             // 2) 真实上传（验证 PutObject 权限）
             $putOk = $instance->put($probeKey, $probeContent);
             if (!$putOk) {
+                $lastDetail = self::lastDetail($instance);
                 return [
                     'ok' => false,
-                    'message' => self::diagnose($driver, 'put_fail', ''),
+                    'message' => self::diagnose($driver, 'put_fail', '') . $lastDetail,
                 ];
             }
 
             // 3) 读取验证
             $got = $instance->get($probeKey);
             if ($got === null || $got !== $probeContent) {
-                $instance->delete($probeKey);
+                try { $instance->delete($probeKey); } catch (\Throwable $ignored) {}
+                $lastDetail = self::lastDetail($instance);
                 return [
                     'ok' => false,
-                    'message' => self::diagnose($driver, 'get_fail', ''),
+                    'message' => self::diagnose($driver, 'get_fail', '') . $lastDetail,
                 ];
             }
 

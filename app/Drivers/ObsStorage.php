@@ -28,6 +28,7 @@ class ObsStorage implements StorageDriverInterface
     private string $accessKey;
     private string $secretKey;
     private ?string $publicUrl;
+    private ?array $lastResponse = null;
 
     public function __construct(array $config)
     {
@@ -36,7 +37,14 @@ class ObsStorage implements StorageDriverInterface
                 throw new \InvalidArgumentException("ObsStorage 缺少配置: $k");
             }
         }
-        $this->endpoint  = rtrim($config['endpoint'], '/');
+        // 智能解析 endpoint（用户可能填各种格式）
+        // 1. 去掉协议头
+        $rawEndpoint = preg_replace('#^https?://#i', '', $config['endpoint']);
+        // 2. 去掉尾部斜杠
+        $rawEndpoint = rtrim($rawEndpoint, '/');
+        // 3. 去掉路径部分
+        $rawEndpoint = preg_replace('#/.*$#', '', $rawEndpoint);
+        $this->endpoint  = $rawEndpoint;
         $this->region    = $config['region'];
         $this->bucket    = $config['bucket'];
         $this->accessKey = $config['access_key'];
@@ -126,7 +134,15 @@ class ObsStorage implements StorageDriverInterface
         $url = $this->bucketUrl();
         $headers = $this->sign('HEAD', $url);
         $resp = $this->httpRequest('HEAD', $url, $headers);
-        return $resp !== null && in_array($resp['code'], [200, 204, 403, 404], true);
+        if ($resp === null) return false;
+        if (in_array($resp['code'], [200, 204, 403, 404], true)) return true;
+        error_log('[ObsStorage::testConnection] HTTP ' . $resp['code'] . ' URL=' . $url . ' body=' . substr($resp['body'] ?? '', 0, 200));
+        return false;
+    }
+
+    public function getLastResponse(): ?array
+    {
+        return $this->lastResponse ?? null;
     }
 
     public function usage(): int
@@ -280,6 +296,9 @@ class ObsStorage implements StorageDriverInterface
             }
         }
 
-        return ['code' => $code, 'headers' => $parsedHeaders, 'body' => $respBody];
+        $result = ['code' => $code, 'headers' => $parsedHeaders, 'body' => $respBody];
+        // 保存最后一次响应（让 testConnection 失败时能给前端精确诊断）
+        $this->lastResponse = $result;
+        return $result;
     }
 }

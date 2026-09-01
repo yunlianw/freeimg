@@ -38,6 +38,13 @@
             <?php
             $val = $item['config'][$key] ?? ($f['default'] ?? '');
             $isPwd = ($f['type'] === 'password');
+            // 密码字段：编辑时显示前 4 位 + 星号（让用户知道密码已存但看不到全部）
+            $maskedPlaceholder = '';
+            if ($isPwd && $item['id'] && !empty($val)) {
+                $valStr = (string)$val;
+                $visibleLen = min(4, mb_strlen($valStr));
+                $maskedPlaceholder = mb_substr($valStr, 0, $visibleLen) . str_repeat('•', max(8, $visibleLen * 2));
+            }
             ?>
             <div class="form-group">
                 <label><?= htmlspecialchars($f['label']) ?><?= !empty($f['required']) ? ' *' : '' ?></label>
@@ -51,14 +58,14 @@
                     <input type="<?= $isPwd ? 'password' : ($f['type'] === 'number' ? 'number' : 'text') ?>"
                            name="cfg_<?= $key ?>"
                            value="<?= $isPwd ? '' : htmlspecialchars((string)$val) ?>"
-                           placeholder="<?= htmlspecialchars($f['placeholder'] ?? '') ?>"
+                           placeholder="<?= htmlspecialchars($maskedPlaceholder ?: ($f['placeholder'] ?? '')) ?>"
                            <?= !empty($f['required']) ? 'required' : '' ?>>
                 <?php endif; ?>
                 <?php if (!empty($f['help'])): ?>
                     <div class="hint"><?= htmlspecialchars($f['help']) ?></div>
                 <?php endif; ?>
                 <?php if ($isPwd && $item['id'] && $val !== ''): ?>
-                    <div class="hint" style="color:var(--green-600);">🔒 已保存密码，留空则不修改</div>
+                    <div class="hint" style="color:var(--green-600);">🔒 已保存密码（<?= htmlspecialchars(mb_substr((string)$val, 0, 4)) ?>****）— 留空则不修改，<a href="javascript:void(0)" class="clear-pwd" data-field="cfg_<?= htmlspecialchars($key) ?>">点此清空重填</a></div>
                 <?php endif; ?>
             </div>
         <?php endforeach; ?>
@@ -109,8 +116,9 @@
 
 <?php if (($def['tutorial'] ?? '') === 'sftp'): ?>
 <!-- ================= SFTP 小白教程 ================= -->
-<div class="config-collapse-wrapper" style="margin-top:16px;">
-    <div class="config-collapse-inner" style="border:1px solid var(--gray-200); border-radius:10px; overflow:hidden;">
+<!-- 注意：不要套 config-collapse-wrapper 类！那个类 max-height:800px + overflow:hidden 会截断底部教程内容 -->
+<div class="sftp-tutorial" style="margin-top:16px;">
+    <div style="border:1px solid var(--gray-200); border-radius:10px; overflow:hidden;">
         <details>
             <summary style="padding:14px 18px; cursor:pointer; font-weight:600; background:var(--gray-50);">
                 📖 SFTP 小白教程 —— 三步把图片存到另一台服务器
@@ -202,5 +210,18 @@ document.getElementById('btn-test')?.addEventListener('click', function () {
         })
         .catch(() => { box.textContent = '❌ 请求失败，请重试'; box.style.color = 'var(--red-500)'; })
         .finally(() => { btn.disabled = false; btn.textContent = '🔌 测试连接'; });
+});
+
+// 点此清空重填：清空密码字段，让用户填新值
+document.querySelectorAll('.clear-pwd').forEach(function (a) {
+    a.addEventListener('click', function () {
+        const fieldName = a.getAttribute('data-field');
+        const input = document.querySelector('input[name="' + fieldName + '"]');
+        if (input) {
+            input.value = '';
+            input.placeholder = '请输入新值';
+            input.focus();
+        }
+    });
 });
 </script>

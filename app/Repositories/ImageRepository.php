@@ -148,10 +148,18 @@ class ImageRepository
         }
         if (isset($where['folder_path'])) {
             // folder_path 是物理路径字符串（如 'covers' 或 'covers/2024'）
-            // 用 LIKE 匹配 storage_path 前缀
-            $conditions[] = '(storage_path = :folder_path OR storage_path LIKE :folder_path_slash)';
+            // 兼容 storage_path 带/不带 url_path_prefix 前缀的两种历史数据
+            $prefix = trim((string)(\config('settings.url_path_prefix') ?? 'img'), '/');
+            $conditions[] = '(
+                storage_path = :folder_path
+                OR storage_path LIKE :folder_path_slash
+                OR storage_path = :folder_path_with_prefix
+                OR storage_path LIKE :folder_path_with_prefix_slash
+            )';
             $params['folder_path'] = $where['folder_path'];
             $params['folder_path_slash'] = $where['folder_path'] . '/%';
+            $params['folder_path_with_prefix'] = $prefix . '/' . $where['folder_path'];
+            $params['folder_path_with_prefix_slash'] = $prefix . '/' . $where['folder_path'] . '/%';
         }
         if (isset($where['status'])) {
             $conditions[] = 'status = :status';

@@ -63,16 +63,27 @@ class ImageController
         if (!is_dir($baseDir)) return [];
 
         $dirs = [];
+        // 递归扫描子目录（深度 2 足够：年/月 这种 Y/m 结构）
         $items = @scandir($baseDir);
         if (!$items) return [];
         foreach ($items as $item) {
             if ($item === '.' || $item === '..') continue;
             $full = $baseDir . '/' . $item;
             if (is_dir($full)) {
-                $dirs[] = ['name' => $item, 'path' => $item];
+                $dirs[] = ['name' => $item, 'path' => $item, 'depth' => 1];
+                // 扫描二级子目录（如 2026/08、2026/09）
+                $subItems = @scandir($full);
+                if (!$subItems) continue;
+                foreach ($subItems as $sub) {
+                    if ($sub === '.' || $sub === '..') continue;
+                    $subFull = $full . '/' . $sub;
+                    if (is_dir($subFull)) {
+                        $dirs[] = ['name' => $item . '/' . $sub, 'path' => $item . '/' . $sub, 'depth' => 2];
+                    }
+                }
             }
         }
-        usort($dirs, fn($a, $b) => strcmp($a['name'], $b['name']));
+        usort($dirs, fn($a, $b) => strcmp($a['path'], $b['path']));
         return $dirs;
     }
 

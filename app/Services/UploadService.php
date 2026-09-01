@@ -364,9 +364,15 @@ class UploadService
             $opts['quality'] = $profile['code'];
         }
 
-        // 水印强一致：后台开启水印时，API 即使选"原图"也强制走水印分支
-        // 例外：调试模式（_debug_no_watermark=1）跳过强制水印，让原图档真的是原图
-        if (WatermarkConfigResolver::resolve() !== null && empty($opts['_debug_no_watermark'])) {
+        // 水印强一致：后台开启水印时，API 强制走水印分支
+        // 例外：
+        // 1. 调试模式（_debug_no_watermark=1）：跳过强制水印
+        // 2. 原图档（profile=original）：用户显式选原图 = 不要任何处理（包括水印），原图/原图档=字节级原图
+        $profileCode = (string)($opts['_compression_profile']['code'] ?? '');
+        $isOriginalProfile = $profileCode === 'original';
+        if (WatermarkConfigResolver::resolve() !== null
+            && empty($opts['_debug_no_watermark'])
+            && !$isOriginalProfile) {
             $opts['_force_watermark'] = true;
         }
 
