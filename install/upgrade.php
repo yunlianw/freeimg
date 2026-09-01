@@ -2,7 +2,7 @@
 /**
  * FreeImg 升级脚本（自动随 install/Installer 触发）
  *
- * 当前版本：v1.3.0
+ * 当前版本：v1.3.2
  * - 清理 v1.1.3 残留的孤儿 settings 行（site_description/default_storage/allow_signup/maintenance_mode）
  * - 幂等：可重复运行，已清理的 key 不会报错
  *
@@ -114,6 +114,29 @@ try {
     if ((int)$check->fetchColumn() === 0) {
         $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES ('max_concurrent_sessions', '3', 'security', NOW())");
         $ins->execute();
+    }
+} catch (Throwable $e) {
+    // 静默跳过
+}
+
+// v1.3.2: 修复老库本地存储 url 字段错误（之前写成了 /uploads 结尾，正确应该是裸域名）
+// 原因：v1.3.2 之前 Installer::createDefaultStorage() 错误地把 url 写为 'https://host/uploads'
+// 路径前缀（settings.url_path_prefix='img'）由 LocalStorage::url() 自动拼接
+// 修复：把结尾的 '/uploads' 去掉
+// 幂等：只对 driver='local' 且 url 以 '/uploads' 结尾的存储做替换
+try {
+    $stmt = $pdo->query("SELECT id, config FROM storages WHERE driver = 'local'");
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $cfg = json_decode($row['config'], true);
+        if (!is_array($cfg)) continue;
+        $url = $cfg['url'] ?? '';
+        // 只匹配以 /uploads 结尾的（避免误伤用户自定义的 url）
+        if (preg_match('#^(https?://[^/]+)/uploads$#', $url, $m)) {
+            $cfg['url'] = $m[1];
+            $newConfig = json_encode($cfg, JSON_UNESCAPED_SLASHES);
+            $upd = $pdo->prepare("UPDATE storages SET config = :c WHERE id = :id");
+            $upd->execute([':c' => $newConfig, ':id' => $row['id']]);
+        }
     }
 } catch (Throwable $e) {
     // 静默跳过

@@ -11,6 +11,29 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.3.2] - 2026-09-02
+
+### 🐛 BUG 修复：全新安装图片无法显示
+
+**症状**：老季朋友全新安装后，上传图片无法显示。
+
+**根因**：`Installer::createDefaultStorage()` 错误地把本地存储 `url` 写成了 `https://host/uploads`。但 `settings.url_path_prefix`（默认 `img`）已由 `LocalStorage::url()` 自动拼接，导致产生 `https://host/uploads/img/...` 这种不存在的 URL。
+
+**修复**：
+- `install/Installer.php` — `url` 改为裸域名（不带 `/uploads`）
+- 路径前缀由 `settings.url_path_prefix` 统一管理（默认 `img`）
+- 完整 URL 自动拼接：`baseUrl + storage_path` = `https://host/img/...`
+
+**附带**：
+- `install/upgrade.php` — v1.3.2 段新增老库存储 url 修复逻辑（幂等）
+  - 跳过：JSON 解码失败（生产环境加密存储）→ 留待后台手动改
+
+**审查**：龙虾二号 1 分 18 秒复审 PASS（含🔴 staging 同步问题）
+
+---
+
+---
+
 ## [v1.3.1] - 2026-09-02
 
 ### 🧹 清理：彻底删除 config.app.url / config.app.force_url

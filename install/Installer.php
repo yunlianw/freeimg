@@ -79,12 +79,22 @@ class Installer
 
     /**
      * 创建默认 Local 存储
+     *
+     * url 用裸域名（如 https://ceshi.5276.net），不带 /uploads /img 等路径前缀
+     * 路径前缀由 settings.url_path_prefix（默认 'img'）+ storage_path 自动拼接
+     * 例如：
+     *   baseUrl      = https://ceshi.5276.net
+     *   prefix       = img（来自 settings.url_path_prefix）
+     *   storage_path = img/2026/08/abc.jpg
+     *   public_url   = https://ceshi.5276.net/img/2026/08/abc.jpg
      */
     public function createDefaultStorage(int $adminId, string $publicHost): void
     {
+        // 智能去协议头（如果用户填了带 https:// 的）
+        $publicHost = preg_replace('#^https?://#i', '', $publicHost);
         $localConfig = json_encode([
             'path' => 'storage/images',
-            'url'  => 'https://' . $publicHost . '/uploads',
+            'url'  => 'https://' . $publicHost,
             'mode' => 'public',
         ]);
         $stmt = $this->pdo->prepare("INSERT INTO storages (user_id, name, driver, config, is_default, status, created_at) VALUES (?, '本地存储', 'local', ?, 1, 1, NOW())");
