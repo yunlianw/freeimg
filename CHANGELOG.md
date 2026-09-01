@@ -68,6 +68,44 @@ site_url  → config.app.force_url → HTTP_HOST → localhost
 
 ---
 
+## [v1.1.8.1] - 2026-09-01
+
+### ✨ 改进：Host 白名单后台可设置（allowed_hosts）
+
+**痛点**：v1.1.8 多域名模式需要去 `config/config.php` 配 `app.allowed_hosts`，朋友是小白不方便。
+
+**方案**：把 allowed_hosts 也搬后台，textarea 输入，每行一个域名。
+
+#### 改动
+
+- `request_origin()` 优先读 `settings.allowed_hosts`，fallback 到 `config.app.allowed_hosts`（兼容过渡期）
+- 设置页加 textarea（每行一个域名，自动补 https://，host 字符白名单）
+- SettingController 加校验逻辑（去 scheme/去尾斜杠/去 CRLF）
+- upgrade.php 加 `allowed_hosts` 默认空字符串（幂等 INSERT IGNORE）
+- 黄色警告条条件改为：既没 settings 又没 config 时显示
+
+#### 行为
+
+| settings 状态 | config 状态 | 行为 |
+|---|---|---|
+| 有值 | - | 用 settings（split + strip scheme）|
+| 空 | 有值 | 用 config |
+| 空 | 空 | 不校验（信任任意 host）|
+
+#### 安全
+
+- 保存时校验：每行必须是合法域名（`#^https?://[a-zA-Z0-9.\-_:]+$#`）
+- 比对时 strip scheme + 小写化（兼容用户输入风格）
+- 拒绝 `javascript:` / 含空格 / 含 CRLF
+
+#### 审查
+
+- 龙虾二号第一次复审抓到 **阻断性 BUG**：settings 存了 `https://` 前缀但比对用裸 host → 永远匹配不上
+- 修复：split 后 strip scheme + 小写化
+- 重测 4 case 全通过
+
+---
+
 ## [v1.1.8] - 2026-09-01
 
 ### ✨ 新增：多域名模式开关（url_follow_host）

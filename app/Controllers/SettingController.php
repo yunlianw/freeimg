@@ -37,6 +37,7 @@ class SettingController
             'share_url',                             // 分享域名（留空跟随主域名）
             'api_url',                               // API 域名（留空跟随主域名）
             'url_follow_host',                       // 多域名模式开关（checkbox）
+            'allowed_hosts',                         // Host 白名单（textarea，每行一个域名）
             'upload_max_size', 'upload_allowed_types',
             'default_compression',
             'strip_exif',
@@ -116,6 +117,27 @@ class SettingController
                         Response::redirect(base_url('settings'));
                     }
                 }
+            }
+            // allowed_hosts：每行一个域名，必须合法
+            if ($key === 'allowed_hosts') {
+                $lines = preg_split('/[\r\n,]+/', $value);
+                $clean = [];
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if ($line === '') continue;
+                    // 自动补 https://
+                    if (!preg_match('#^https?://#i', $line)) {
+                        $line = 'https://' . $line;
+                    }
+                    $line = rtrim($line, '/');
+                    if (!preg_match('#^https?://[a-zA-Z0-9.\-_:]+$#', $line)) {
+                        flash('error', 'Host 白名单格式不正确：每行一个域名，如 img.example.com 或 https://img.example.com');
+                        Response::redirect(base_url('settings'));
+                    }
+                    $clean[] = $line;
+                }
+                // 存为换行分隔的字符串（request_origin 函数按行/逗号 split）
+                $value = implode("\n", $clean);
             }
 
             // 路径前缀特殊校验：只允许字母/数字/斜杠/下划线/短横线

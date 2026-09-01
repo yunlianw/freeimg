@@ -190,7 +190,31 @@ function request_origin(): string
     $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? ($_SERVER['HTTP_HOST'] ?? 'localhost');
     $host = trim(explode(',', $host, 2)[0] ?? '');
     // 白名单校验（多域名模式必须配）
-    $allowed = config('app.allowed_hosts', null);
+    // 优先级：settings.allowed_hosts（后台可改） → config.app.allowed_hosts（兼容旧版）
+    $allowed = null;
+    try {
+        $settingsAllowed = \App\Core\Db::fetchValue(
+            "SELECT `value` FROM settings WHERE `key` = 'allowed_hosts' LIMIT 1"
+        );
+        if (is_string($settingsAllowed) && $settingsAllowed !== '') {
+            // 兼容用户手填完整 URL 和裸域名：split 后 strip scheme，得到裸 host 用于比对
+            $allowed = array_values(array_filter(array_map(function ($v) {
+                $v = trim($v);
+                if ($v === '') return '';
+                // 去 scheme、去尾部斜杠、统一小写
+                $v = preg_replace('#^https?://#i', '', $v);
+                $v = rtrim($v, '/');
+                return strtolower($v);
+            }, preg_split('/[\r\n,]+/', $settingsAllowed)), function ($v) {
+                return $v !== '';
+            }));
+        }
+    } catch (\Throwable $e) {
+        // 静默 fallback
+    }
+    if (!is_array($allowed) || empty($allowed)) {
+        $allowed = config('app.allowed_hosts', null);
+    }
     if (is_array($allowed) && !empty($allowed) && !in_array($host, $allowed, true)) {
         // host 不在白名单 → fallback 到 config.app.url
         $fallback = rtrim((string)config('app.url', ''), '/');

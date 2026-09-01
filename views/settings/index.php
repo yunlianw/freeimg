@@ -50,13 +50,22 @@
                 ⚠️ <b>必须同时</b>在 <code>config/config.php</code> 的 <code>app.allowed_hosts</code> 填入所有合法域名（防 Host 头伪造）<br>
                 💡 关闭时（默认）：API/分享链接用上面填的「主域名/分享/API 域名」（推荐单域名场景）
             </div>
-            <?php if (($settings['url_follow_host'] ?? '0') === '1' && empty(config('app.allowed_hosts'))): ?>
+            <?php if (($settings['url_follow_host'] ?? '0') === '1' && empty($settings['allowed_hosts']) && empty(config('app.allowed_hosts'))): ?>
                 <div style="margin-top:8px; padding:10px 14px; background:#fef3c7; border-left:4px solid #f59e0b; border-radius:4px; color:#92400e; font-size:13px;">
-                    ⚠️ <b>未配置 allowed_hosts 白名单！</b> 多域名模式已开启但 config 里没填白名单，当前会信任任意 Host 头（存在安全风险）。<br>
-                    请在 <code>config/config.php</code> 的 <code>app</code> 节加：<br>
-                    <code style="display:block; margin-top:4px; padding:4px 8px; background:#fff;'allowed_hosts' =&gt; ['pic.5276.net', 'img.xxx.com'],</code>
+                    ⚠️ <b>未配置 Host 白名单！</b> 多域名模式已开启但还没填白名单，当前会信任任意 Host 头（存在安全风险）。<br>
+                    请在下方「Host 白名单」框里填入所有合法域名（每行一个），然后点保存。
                 </div>
             <?php endif; ?>
+        </div>
+        <div class="form-group">
+            <label>Host 白名单 <span style="color:#999;font-weight:normal;">（每行一个域名）</span></label>
+            <textarea name="allowed_hosts" rows="4" placeholder="pic.5276.net&#10;img.example.com&#10;cdn.example.com"><?= htmlspecialchars($settings['allowed_hosts'] ?? '') ?></textarea>
+            <div class="hint">
+                💡 <b>多域名模式必填</b>：宝塔多个站点指向同一图床时，必须把所有合法域名都列上（防 Host 头伪造）<br>
+                💡 <b>留空</b>：仅信任 config.app.url（推荐单域名用户，多域名用户必须填）<br>
+                💡 <b>格式</b>：每行一个域名，自动补 <code>https://</code>（也可直接写完整 URL）<br>
+                💡 <b>兼容</b>：config/config.php 的 <code>app.allowed_hosts</code> 仍生效（后台优先）
+            </div>
         </div>
         <div style="display:flex; gap:8px; margin-top:12px;">
             <button type="submit" name="submit_section" value="basic" class="btn-primary">💾 保存基础设置</button>

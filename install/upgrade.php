@@ -93,6 +93,19 @@ try {
     // 静默跳过
 }
 
+// v1.1.8: Host 白名单（allowed_hosts）后台可设置
+// 老库升级：INSERT 空字符串（行为不变，留空则走 config.app.allowed_hosts 兜底）
+try {
+    $check = $pdo->prepare('SELECT COUNT(*) FROM settings WHERE `key` = :k');
+    $check->execute([':k' => 'allowed_hosts']);
+    if ((int)$check->fetchColumn() === 0) {
+        $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES ('allowed_hosts', '', 'general', NOW())");
+        $ins->execute();
+    }
+} catch (Throwable $e) {
+    // 静默跳过
+}
+
 // 记录升级日志（可选）
 if ($deleted > 0) {
     error_log('[FreeImg upgrade v1.1.4-alpha] Cleaned ' . $deleted . ' orphan settings rows');
