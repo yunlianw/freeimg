@@ -344,11 +344,33 @@ server {
 ```
 
 **宝塔面板**（推荐新手）：
-1. 宝塔 → 网站 → 添加站点
-2. **PHP 版本**：选 8.0 或更高
-3. **网站根目录**：⚠️ **`/www/wwwroot/freeimg/public`**（不是 freeimg 本身）
-4. 添加完成后：宝塔 → 网站 → 配置文件 → 把上面的伪静态部分（`location /` 等）粘贴进去
-5. 重启 Nginx
+
+> ⚠️ **关键**：根目录设置分两步！安装向导在项目根目录，**必须先安装再改根目录**，否则 /install/ 会 404。
+
+【第 1 步】添加站点（**先别改根目录**）
+1. 宝塔 → 网站 → 添加站点 → 填域名、选 PHP 8.0+
+2. ✅ **网站根目录保持默认** `/www/wwwroot/freeimg`（**不是 public/**）
+3. 数据库：在宝塔「数据库」菜单新建库 + 用户
+
+【第 2 步】跑安装向导
+1. 浏览器打开 `http://你的域名/install/`
+2. ① 环境检测 → ② 填数据库信息 → ③ 自动建表 + 创建管理员 → ④ 完成
+3. 完成标志：生成 `config/config.php` + `install/install.lock`
+4. ⚠️ 此时先别管伪静态，向导直接访问 `/install/index.php`
+
+【第 3 步】改根目录 → public/
+1. 宝塔 → 网站 → 设置 → 网站目录 → 运行目录/根目录改为 `/www/wwwroot/freeimg/public`
+2. ✅ 改完后再访问根域名才会走 index.php 路由，而不是列目录/404
+
+【第 4 步】粘贴伪静态
+1. 宝塔 → 网站 → 设置 → 配置文件 → 粘贴上面 `.nginx.conf` 的 `location / { try_files … }` 部分
+2. 必须加，否则非 index.php 路径全 404
+
+【第 5 步】重启 + 安全收尾
+1. 重启 Nginx 生效
+2. `rm -rf /www/wwwroot/freeimg/install/` ← 删除安装向导（必须）
+3. `chmod 600 /www/wwwroot/freeimg/config/config.php` ← 收紧权限
+4. 登录后台 → 立即：改默认密码 → 开 2FA → 配 Host 白名单（多域名场景）
 
 **快速确认**：
 ```bash
@@ -389,17 +411,18 @@ curl -I http://img.yourdomain.com/
 ```
 
 **宝塔 Apache**：
-1. 宝塔 → 网站 → 添加站点
-2. **网站根目录**：`/www/wwwroot/freeimg/public`
-3. 伪静态：宝塔已自动写入 `.htaccess`（项目自带），无需额外操作
+1. 宝塔 → 网站 → 添加站点（**根目录先默认** `/www/wwwroot/freeimg`）
+2. 浏览器访问 `http://你的域名/install/` → 走安装向导
+3. 安装完成后改根目录 → `/www/wwwroot/freeimg/public`
+4. 伪静态：宝塔已自动写入 `.htaccess`（项目自带），无需额外操作
 
 ### 4️⃣ 运行安装向导
 
-**检查清单**（重要！按顺序做完才能进安装页）：
+**前置条件**：第 1 步已完成（添加站点，根目录**默认** `/www/wwwroot/freeimg`，**未改**）。
 
 ```bash
-# ✅ 1. 网站根目录已设置为 /www/wwwroot/freeimg/public
-# ✅ 2. 伪静态已配置（location / { try_files ... }）
+# ✅ 1. 网站根目录**仍是** /www/wwwroot/freeimg（默认，**未改**为 public/）
+# ✅ 2. 数据库已创建（宝塔「数据库」菜单新建库 + 用户）
 # ✅ 3. PHP-FPM 用户（www）有写权限
 chown -R www:www /www/wwwroot/freeimg
 # ✅ 4. storage 目录可写

@@ -11,6 +11,37 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.3.3] - 2026-09-02
+
+### 🐛 BUG 修复：全新安装与开发环境行为不一致
+
+**症状**：老季朋友全新安装后，图片上传/显示跟老季生产环境不一致（虽然能存，但行为有偏差）。
+
+**根因**：v1.3.2 把 Installer 默认本地存储 path 设为 `storage/images`，但老季生产环境（nginx root=public）实际用 path=`public`，写到 `public/img/...`。两个行为不同，新装用户必须手动改 path。
+
+**修复**：
+- `install/Installer.php::createDefaultStorage()` — 默认 path 改回 `public`（与开发环境一致）
+- 朋友新装即跟老季生产环境 100% 一致：`path=public`，文件写到 `public/img/2026/09/xxx.jpg`
+- URL 自动生成：`https://域名/img/2026/09/xxx.jpg`（直接可访问，无需 nginx alias）
+
+### 📝 README 修复：宝塔安装步骤顺序错误（老季手测发现）
+
+**症状**：README 之前的宝塔安装步骤直接让用户把网站根目录设为 `public/`，导致访问 `/install/` 时 404（install 在项目根目录，不是 public/）。
+
+**修复**：
+- README 宝塔步骤重写为 5 步：
+  1. 添加站点（根目录先默认 `freeimg`）
+  2. 跑 `/install/` 安装向导
+  3. 改根目录 → `public/`
+  4. 粘贴伪静态
+  5. 重启 + 删 install/
+
+**审查**：龙虾二号 43 秒复审 PASS
+
+**
+
+---
+
 ## [v1.3.2] - 2026-09-02
 
 ### 🐛 BUG 修复：全新安装图片无法显示

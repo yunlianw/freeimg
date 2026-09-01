@@ -80,20 +80,19 @@ class Installer
     /**
      * 创建默认 Local 存储
      *
-     * url 用裸域名（如 https://ceshi.5276.net），不带 /uploads /img 等路径前缀
-     * 路径前缀由 settings.url_path_prefix（默认 'img'）+ storage_path 自动拼接
-     * 例如：
-     *   baseUrl      = https://ceshi.5276.net
-     *   prefix       = img（来自 settings.url_path_prefix）
-     *   storage_path = img/2026/08/abc.jpg
-     *   public_url   = https://ceshi.5276.net/img/2026/08/abc.jpg
+     * v1.3.3: 改 path 默认为 'public'（与开发环境一致）
+     *   - path = 'public' → 实际写入 `public/img/2026/09/xxx.jpg`
+     *   - URL = `https://域名/img/2026/09/xxx.jpg`（直接可访问）
+     *   - 不依赖 nginx alias，新装就可用
+     *
+     * 历史：v1.3.2 用 'storage/images'，但实际生产（nginx root=public）下需要 nginx alias 配置
      */
     public function createDefaultStorage(int $adminId, string $publicHost): void
     {
         // 智能去协议头（如果用户填了带 https:// 的）
         $publicHost = preg_replace('#^https?://#i', '', $publicHost);
         $localConfig = json_encode([
-            'path' => 'storage/images',
+            'path' => 'public',
             'url'  => 'https://' . $publicHost,
             'mode' => 'public',
         ]);
