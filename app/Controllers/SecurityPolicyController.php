@@ -46,6 +46,7 @@ class SecurityPolicyController
 
         $map = [
             'session_ttl_hours'      => [1, 8760, 24],
+            'max_concurrent_sessions'=> [1, 20, 3],   // v1.3.0 新增：最大并发会话数
             'login_max_failed'       => [1, 100, 5],
             'login_lock_minutes'     => [1, 1440, 15],
             'password_min_length'    => [8, 64, 10],

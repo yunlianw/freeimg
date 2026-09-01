@@ -17,6 +17,11 @@
             <input type="number" name="session_ttl_hours" min="1" max="8760" value="<?= h($settings['session_ttl_hours'] ?? '24') ?>" required>
             <div class="hint">1 小时 ~ 12 个月（8760 小时）· 滑动过期，每次活动自动续期</div>
         </div>
+        <div class="form-group">
+            <label>最大并发会话数</label>
+            <input type="number" name="max_concurrent_sessions" min="1" max="20" value="<?= h($settings['max_concurrent_sessions'] ?? '3') ?>" required>
+            <div class="hint">同一账号可同时登录的设备/浏览器数 · 超出自动踢掉最久没活动的会话 · 设 1 等同单点登录</div>
+        </div>
     </div>
 
     <div class="field-group">

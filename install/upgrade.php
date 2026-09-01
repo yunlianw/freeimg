@@ -2,7 +2,7 @@
 /**
  * FreeImg 升级脚本（自动随 install/Installer 触发）
  *
- * 当前版本：v1.1.8
+ * 当前版本：v1.3.0
  * - 清理 v1.1.3 残留的孤儿 settings 行（site_description/default_storage/allow_signup/maintenance_mode）
  * - 幂等：可重复运行，已清理的 key 不会报错
  *
@@ -100,6 +100,19 @@ try {
     $check->execute([':k' => 'allowed_hosts']);
     if ((int)$check->fetchColumn() === 0) {
         $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES ('allowed_hosts', '', 'general', NOW())");
+        $ins->execute();
+    }
+} catch (Throwable $e) {
+    // 静默跳过
+}
+
+// v1.3.0: 最大并发会话数（默认 3）
+// 老库升级：INSERT '3'（行为从 1 → 3，放宽多端登录限制）
+try {
+    $check = $pdo->prepare('SELECT COUNT(*) FROM settings WHERE `key` = :k');
+    $check->execute([':k' => 'max_concurrent_sessions']);
+    if ((int)$check->fetchColumn() === 0) {
+        $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES ('max_concurrent_sessions', '3', 'security', NOW())");
         $ins->execute();
     }
 } catch (Throwable $e) {

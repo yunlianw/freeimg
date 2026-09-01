@@ -11,6 +11,40 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.3.0] - 2026-09-02
+
+### ✨ 新增：最大并发会话数限制（多端登录）
+
+**痛点**：v1.1.5 加的 `destroyAllForUser()` 强制单点登录（每登录踢光所有端），老季手测发现两个浏览器不能同时登录。
+
+**方案**（龙虾二号方案）：
+- 默认允许 3 个并发会话，可后台配置（1-20）
+- 超限自动踢掉 `last_activity_at` 最早的会话（最久没活动的）
+- `destroyAllForUser()` 保留给 admin 强制下线/改密踢人用
+
+**改动**：
+- `app/Services/SessionService.php` — 新增 `enforceLimit($userId, $limit)` 方法
+- `app/Controllers/AuthController.php:completeLogin()` — `destroyAllForUser()` → `enforceLimit()`
+- `install/upgrade.php` — INSERT `max_concurrent_sessions=3`（v1.3.0 段）
+- `app/Controllers/SecurityPolicyController.php` — 加 `max_concurrent_sessions` 到 $map（范围 1-20）
+- `views/security/policy.php` — 加 number input 字段
+
+**配置**：
+- 后台 → 安全 → 安全策略 → 「最大并发会话数」（默认 3，范围 1-20）
+- 设 1 等同单点登录
+
+**兜底**：
+- upgrade.php INSERT 默认值 3
+- 代码 `(int)config(...) ?: 3`
+- 视图 `?? 3`
+- `enforceLimit` 内部 `max(1, min(20, $limit))` 防御性钳制
+
+**审查**：龙虾二号 1 分钟复审 PASS（实测 DELETE ... LIMIT :lim 在真实 DB 执行成功）
+
+---
+
+---
+
 ## [v1.2.0] - 2026-09-02
 
 ### 🐛 BUG 修复：基础设置独立保存丢失 url_follow_host / allowed_hosts

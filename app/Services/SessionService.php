@@ -112,4 +112,35 @@ class SessionService
     {
         return Db::execute('DELETE FROM user_sessions WHERE expires_at < NOW()')->rowCount();
     }
+
+    /**
+     * 强制并发限制：超过上限时踢掉最老的（按 last_activity_at ASC）
+     *
+     * 调用场景：登录成功后，新会话即将 INSERT 之前调用
+     *   - 已有活跃数 + 1（新会话） > limit 时才踢
+     *   - 上限 1 时等价于"单点登录"（踢掉所有旧 session）
+     *   - 过期 session 不占名额（先 cleanupExpired）
+     *
+     * 返回被踢的 session 数（供调用方日志/调试）
+     */
+    public static function enforceLimit(int $userId, int $limit): int
+    {
+        // 防御性钳制（控制器已有 1-20 校验，这是双保险；防 DB 字段被篡改越界）
+        $limit = max(1, min(20, $limit));
+        self::cleanupExpired();
+        $active = (int)(Db::fetchOne(
+            'SELECT COUNT(*) AS c FROM user_sessions WHERE user_id = :uid AND expires_at > NOW()',
+            ['uid' => $userId]
+        )['c'] ?? 0);
+        // 新会话占 1 个名额，所以只需踢掉 ($active - ($limit - 1)) 个
+        $excess = $active - ($limit - 1);
+        if ($excess <= 0) return 0;
+        return Db::execute(
+            'DELETE FROM user_sessions
+             WHERE user_id = :uid AND expires_at > NOW()
+             ORDER BY last_activity_at ASC
+             LIMIT :lim',
+            ['uid' => $userId, 'lim' => $excess]
+        )->rowCount();
+    }
 }
