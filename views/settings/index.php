@@ -47,7 +47,7 @@
             </label>
             <div class="hint">
                 💡 开启后：API 返回的图片URL、分享链接都使用访客当前访问的域名（适合宝塔里多个站点指向同一图床目录）<br>
-                ⚠️ <b>必须同时</b>在 <code>config/config.php</code> 的 <code>app.allowed_hosts</code> 填入所有合法域名（防 Host 头伪造）<br>
+                ⚠️ <b>必须同时</b>在下方「Host 白名单」框里填入所有合法域名（防 Host 头伪造）<br>
                 💡 关闭时（默认）：API/分享链接用上面填的「主域名/分享/API 域名」（推荐单域名场景）
             </div>
             <?php if (($settings['url_follow_host'] ?? '0') === '1' && empty($settings['allowed_hosts']) && empty(config('app.allowed_hosts'))): ?>

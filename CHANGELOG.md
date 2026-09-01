@@ -9,6 +9,27 @@ FreeImg 所有版本更新日志。
 
 ## [Unreleased]
 
+---
+
+## [v1.2.0] - 2026-09-02
+
+### 🐛 BUG 修复：基础设置独立保存丢失 url_follow_host / allowed_hosts
+
+**症状**：用户后台开启多域名模式 + 填 Host 白名单 → 保存 → 刷新后多域名模式被去掉、白名单丢失
+
+**根因**：基础设置组独立保存按钮（submit_section=basic）的 `$basicOnly` 数组只包含 4 个字段（site_name/site_url/share_url/api_url），漏掉了 url_follow_host 和 allowed_hosts
+
+**修复**：$basicOnly 增加两个字段
+```php
+$basicOnly = [\site_name, \site_url, \share_url, \api_url, \url_follow_host, \allowed_hosts];
+```
+
+**附带改进**：文案更新（提示用户在「下方 Host 白名单」配置，而不是去改 config.php）
+
+**审查**：龙虾二号 20 秒复审 PASS
+
+---
+
 ### 🧹 重大清理：config 大幅精简 + 域名生成 URL BUG 修复
 
 #### 🧹 config 精简

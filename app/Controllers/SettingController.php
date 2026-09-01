@@ -28,8 +28,8 @@ class SettingController
         // 判断提交的是哪个区块（不同按钮 → 不同 allowed 列表）
         $submitSection = (string)$request->post('submit_section', 'all');
 
-        // 基础设置（站点名称、主域名、分享域名、API域名） — 独立保存
-        $basicOnly = ['site_name', 'site_url', 'share_url', 'api_url'];
+        // 基础设置（站点名称、主域名、分享域名、API域名、多域名模式、Host白名单）— 独立保存
+        $basicOnly = ['site_name', 'site_url', 'share_url', 'api_url', 'url_follow_host', 'allowed_hosts'];
 
         $allowed = $submitSection === 'basic' ? $basicOnly : [
             'site_name',
