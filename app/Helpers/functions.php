@@ -113,10 +113,33 @@ function current_url(): string
 /**
  * 当前请求的 origin（scheme + host，无 path）
  * 例：https://pic.5276.net
- * 注意：HTTP_HOST 可能被反代/客户端伪造，生产环境如用 CDN 请设置 config.app.force_url=true 走写死值
+ * 优先级：
+ *   1. settings.site_url（后台可设置，覆盖访问域名）
+ *   2. config 强制开关 app.force_url + app.url
+ *   3. 当前请求的 host（动态）
+ *   4. localhost 兜底
  */
 function base_origin(): string
 {
+    // 0. 优先读 settings 表 site_url（后台可改）
+    try {
+        $siteUrl = \App\Core\Db::fetchValue(
+            "SELECT `value` FROM settings WHERE `key` = 'site_url' LIMIT 1"
+        );
+        if (is_string($siteUrl) && $siteUrl !== '') {
+            $clean = rtrim($siteUrl, '/');
+            if (preg_match('#^https?://[a-zA-Z0-9.\-_:]+(/.*)?$#', $clean)) {
+                // 只取 origin（去掉 path）
+                $parts = parse_url($clean);
+                $origin = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
+                if (isset($parts['port'])) $origin .= ':' . $parts['port'];
+                if ($origin !== '://') return $origin;
+            }
+        }
+    } catch (\Throwable $e) {
+        // 表不存在或 DB 异常时静默 fallback（兼容安装前）
+    }
+
     // 1. config 强制开关（生产/CDN 推荐）
     if (config('app.force_url', false)) {
         return rtrim((string)config('app.url', ''), '/');

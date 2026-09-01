@@ -9,6 +9,19 @@ FreeImg 所有版本更新日志。
 
 ## [Unreleased]
 
+### ✨ 新增：后台站点URL设置
+- **功能**：在「系统设置 → 基础设置」加「站点URL」输入框
+- **留空**：自动跟随访问域名（迁移域名不用改这里）
+- **填写**：所有 API 返回的URL、分享链接、图片直链都用这个域名（适合 CDN/多域名）
+- **优先级**：settings.site_url > config.app.force_url > 访问域名
+- **安全**：
+  - 只接受 http/https scheme（拒绝 javascript:/data:/file:/ftp）
+  - host 字符白名单 + 自动补 https://
+  - DB 异常静默 fallback
+- **安装**：自动写入 `https://{$HTTP_HOST}` 作为默认值
+- **升级**：老库升级无需操作，settings.site_url 不存在时 fallback 到访问域名
+- **审查**：龙虾二号超时，我手动 16 case 安全测试全通过
+
 ---
 
 ## [v1.1.6] - 2026-09-01

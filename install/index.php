@@ -81,7 +81,7 @@ if ($step === 3 && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $adminId = $inst->createAdmin($adminUser, $adminEmail, $adminPass);
                 $inst->createDefaultStorage($adminId, $_SERVER['HTTP_HOST']);
-                $inst->seedSettings();
+                $inst->seedSettings($_SERVER['HTTP_HOST']);
                 $inst->seedCompressionProfiles();
                 $pdo->commit();
             } catch (Throwable $e) {

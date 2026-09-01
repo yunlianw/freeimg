@@ -16,6 +16,15 @@
             <label>站点名称</label>
             <input type="text" name="site_name" value="<?= htmlspecialchars($settings['site_name'] ?? 'FreeImg') ?>">
         </div>
+        <div class="form-group">
+            <label>站点URL（域名）</label>
+            <input type="text" name="site_url" value="<?= htmlspecialchars($settings['site_url'] ?? '') ?>" placeholder="留空 = 跟随访问域名（如 https://pic.5276.net）">
+            <div class="hint">
+                💡 <b>用途</b>：API 返回的图片直链、生成的URL、分享链接等都会用这个域名<br>
+                💡 <b>留空</b>：自动用用户访问的域名（推荐，迁移域名不用改这里）<br>
+                💡 <b>填写</b>：例如 <code>https://img.example.com</code>，所有外链 URL 都走这个域名（适合 CDN/多域名场景）
+            </div>
+        </div>
     </div>
 
     <div class="field-group">

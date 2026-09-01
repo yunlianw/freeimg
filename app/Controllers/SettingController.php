@@ -27,6 +27,7 @@ class SettingController
 
         $allowed = [
             'site_name',
+            'site_url',                              // 站点域名（后台可改）
             'upload_max_size', 'upload_allowed_types',
             'default_compression',
             'strip_exif',
@@ -72,6 +73,24 @@ class SettingController
 
         foreach ($allowed as $key) {
             $value = trim((string)$request->post($key, ''));
+
+            // 站点 URL 校验：必须是合法 http(s) URL，host 字符白名单
+            if ($key === 'site_url') {
+                if ($value === '') {
+                    // 空 = 跟随访问域名
+                    $value = '';
+                } else {
+                    // 自动补 https://（用户只填域名时）
+                    if (!preg_match('#^https?://#i', $value)) {
+                        $value = 'https://' . $value;
+                    }
+                    $value = rtrim($value, '/');
+                    if (!preg_match('#^https?://[a-zA-Z0-9.\-_:]+(/.*)?$#', $value)) {
+                        flash('error', '站点URL格式不正确（例：https://img.example.com）');
+                        Response::redirect(base_url('settings'));
+                    }
+                }
+            }
 
             // 路径前缀特殊校验：只允许字母/数字/斜杠/下划线/短横线
             if ($key === 'url_path_prefix') {
