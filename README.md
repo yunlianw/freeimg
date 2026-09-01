@@ -317,18 +317,9 @@ server {
         access_log off;
         add_header Cache-Control "public, max-age=2592000";
     }
-
-    # === 历史图片兼容（如果之前有图在 public/img/）===
-    location /img/ {
-        alias /www/wwwroot/freeimg/public/img/;
-        expires 30d;
-    }
-
-    # === 旧版 /uploads/ 兼容（如果用 symlink 失败，可改用 alias）===
-    location /uploads/ {
-        alias /www/wwwroot/freeimg/storage/images/;
-        expires 30d;
-    }
+    # 注：v1.3.4 起去掉 /img/ 和 /uploads/ alias
+    # - path=public（默认）：nginx root 直接 serve public/img/，零额外配置
+    # - path=storage/images：在 public/ 建软链 ln -s ../storage/images/img img，try_files 自动跟随
 
     # === PHP 处理 ===
     location ~ \.php$ {
@@ -472,6 +463,40 @@ cp /www/wwwroot/freeimg/config/config.php /backup/
 # 2. 开启 2FA（保存备份码！）
 # 3. 设置安全策略
 ```
+
+---
+
+## 🔀 伪静态规则
+
+FreeImg 提供两套预置伪静态（**完全通用**，不依赖 storage 路径配置）：
+
+| 服务器 | 文件 | 部署 |
+|---|---|---|
+| Apache | `public/.htaccess`（已随项目）| 无需额外配置 |
+| Nginx | `.nginx.conf` | 复制到宝塔「网站 → 配置文件」（server { } 内）|
+
+两套规则使用同一原理：
+
+- **文件存在** → 直读（不经过 PHP）
+- **文件不存在** → 路由到 `index.php`
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.php?$query_string;
+}
+```
+
+**为什么不需要 alias？**
+
+- `path=public`（默认）：图片物理在 `public/img/`，站点 root 直接 serve
+- `path=storage/images`：在 `public/` 下建软链 `ln -s ../storage/images/img img`，`try_files` 自动跟随（nginx 默认行为）
+- **不要使用 alias 指向 storage 路径** — alias 里的路径是写死的，换项目就 404
+
+**老用户升级兼容**：
+
+- 已用 `path=public` 的用户：删 alias 后零影响 ✓
+- 已用 `path=storage/images` 的用户：删 alias 后建软链 `public/img → ../storage/images/img` 即可
+- 老 link `/uploads/xxx` 已通过 `public/uploads` 软链兼容（见 `Installer::ensureDirectories`）
 
 ---
 

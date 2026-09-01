@@ -112,11 +112,16 @@ class Installer
             ['site_url', 'https://' . ($publicHost ?? 'localhost'), 'general'],
             ['upload_max_size', '10', 'upload'],
             ['upload_allowed_types', 'jpg,jpeg,png,gif,webp,bmp', 'upload'],
-            ['default_compression', 'balanced', 'image'],
+            // v1.3.4: 默认压缩档改 saver（与生产环境一致，老季手测确认）
+            ['default_compression', 'saver', 'image'],
             // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
             ['browser_upload_mode', 'browser', 'image'],
             // Phase 9.5: 隐私安全 - 默认开启 EXIF/IPTC/XMP 剥离（手机拍图含 GPS）
             ['strip_exif', '1', 'image'],
+            // v1.3.4: 显式种子目录规则（之前依赖 fallback，新装会落到扁平目录）
+            ['dir_rule', 'month', 'image'],
+            // v1.3.4: 显式种子重命名规则
+            ['rename_rule', 'short', 'image'],
         ];
         $stmt = $this->pdo->prepare("INSERT IGNORE INTO settings (`key`, `value`, `group`, created_at) VALUES (?, ?, ?, NOW())");
         foreach ($defaults as $s) {
@@ -147,9 +152,10 @@ class Installer
         }
 
         // Phase 9.3: profiles 插入后（id 1-6 稳定）再设 Web/API 默认档
-        // 均衡(id=3) 为 Web 默认，极限省流(id=5) 为 API 默认
+        // 省流(id=4) 为 Web 默认，极限省流(id=5) 为 API 默认
         $stmt2 = $this->pdo->prepare("INSERT IGNORE INTO settings (`key`, `value`, `group`, created_at) VALUES (?, ?, ?, NOW())");
-        $stmt2->execute(['web_compression_profile_id', '3', 'image']);
+        // v1.3.4: web_compression_profile_id=4（省流档，saver），与 default_compression=saver 保持一致
+        $stmt2->execute(['web_compression_profile_id', '4', 'image']);
         $stmt2->execute(['api_compression_profile_id', '5', 'image']);
     }
 

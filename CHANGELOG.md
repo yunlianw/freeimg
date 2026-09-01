@@ -11,6 +11,38 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.3.4] - 2026-09-02
+
+### 🐛 BUG 修复：全新安装默认值与生产环境不一致
+
+老季要求「新安装版本跟我一样」，龙虾二号端到端对比找出 4 处不一致：
+
+1. **F1: 目录规则 dir_rule 安装时未种子** → 新装图片落到扁平目录，**与生产 `2026/09/` 不一致**
+   - 修复：`seedSettings()` 显式种子 `dir_rule=month`、`rename_rule=short`
+2. **F2: 默认压缩档 balanced vs 生产 saver** → 修复：`default_compression=saver` + `web_compression_profile_id=4`
+3. **F3: .nginx.conf /img/ alias 指向 storage/images**（实际 path=public 写到 public/img/）
+   - 修复：去掉 /img/ alias（保留 `/uploads/` 兼容软链）
+4. **F4: 安装向导密码最小长度 8** vs 安全策略 10 → 修复 step3 minlength=10
+
+### 📝 伪静态规则：去 /uploads/ alias + 通用化（老季手测要求）
+
+老季要求「我的和开源的文档里面必须一致」+「伪静态必须全部通用」。
+
+- `.nginx.conf` 去掉残留的 `/uploads/` alias（路径硬编码错误）
+- 加静态资源缓存 location（图片/字体/css/js/svg 30 天）
+- 通用方案：`try_files $uri` + 不写 alias，依赖 nginx root 直读或符号链接
+- `public/.htaccess` **不改**（已通用，Apache RewriteCond -f/-d 等价）
+- README 新增「🔀 伪静态规则」章节，详细解释通用原理和升级兼容
+
+### 审查
+
+- 龙虾二号 50 秒复审 v1.3.4 修复 PASS
+- 龙虾二号 37 秒分析通用伪静态方案 → 落地执行
+
+---
+
+---
+
 ## [v1.3.3] - 2026-09-02
 
 ### 🐛 BUG 修复：全新安装与开发环境行为不一致

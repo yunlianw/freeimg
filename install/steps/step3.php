@@ -15,8 +15,8 @@
     </div>
     <div class="form-group">
         <label>管理员密码</label>
-        <input type="password" name="admin_password" required minlength="8">
-        <div class="hint">至少 8 位，请妥善保管</div>
+        <input type="password" name="admin_password" required minlength="10">
+        <div class="hint">至少 10 位（与密码安全策略一致），请妥善保管</div>
     </div>
     <div style="display:flex; justify-content:space-between; margin-top:24px;">
         <a href="?step=2" class="btn" style="background:#868e96;">← 上一步</a>
