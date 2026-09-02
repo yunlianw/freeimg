@@ -1,7 +1,7 @@
 <div class="login-box">
     <div class="login-card">
         <div class="login-header">
-            <h1>🖼️ FreeImg</h1>
+            <h1>🖼️ <?= h(brand()) ?></h1>
             <p>自由图床 · 管理后台</p>
         </div>
         <?php if ($err = flash('error')): ?>

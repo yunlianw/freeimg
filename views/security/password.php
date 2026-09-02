@@ -3,6 +3,13 @@
     <p class="subtitle">建议使用 12 位以上、包含大小写字母和数字的强密码</p>
 </div>
 
+<?php
+// v1.3.8: 从安全策略设置读取，跟服务端校验一致
+// 0 值归一为 5（服务端 PasswordService 行为），避免"不能重用最近 0 个"显示
+$pwdMinLen = (int)($password_min_length ?? 10);
+$pwdHistory = (int)($password_history_count ?? 5) ?: 5;
+?>
+
 <?php if ($flash !== null): ?>
     <div class="alert alert-<?= h($flash['type']) ?>"><?= h($flash['message']) ?></div>
 <?php endif; ?>
@@ -16,12 +23,12 @@
         </div>
         <div class="form-group">
             <label>新密码 <span id="strength-label" style="font-weight:normal; font-size:12px;"></span></label>
-            <input type="password" name="new_password" id="new_password" required autocomplete="new-password" minlength="10">
+            <input type="password" name="new_password" id="new_password" required autocomplete="new-password" minlength="<?= $pwdMinLen ?>">
             <div id="strength-bar" style="margin-top:6px; height:6px; background:var(--gray-200); border-radius:3px; overflow:hidden;">
                 <div id="strength-fill" style="height:100%; width:0%; background:var(--red-500); transition:all .2s;"></div>
             </div>
             <div class="hint" style="font-size:12px; color:var(--gray-500); margin-top:4px;">
-                至少 10 位 · 建议包含大小写字母、数字、特殊符号
+                至少 <?= $pwdMinLen ?> 位 · 建议包含大小写字母、数字、特殊符号
             </div>
         </div>
         <div class="form-group">
@@ -37,7 +44,7 @@
     <ul style="font-size:13px; color:var(--gray-700); line-height:1.8;">
         <li>你当前浏览器的会话<strong>保留</strong></li>
         <li>其他设备/浏览器的登录会被<strong style="color:var(--red-500);">强制下线</strong>，需用新密码重新登录</li>
-        <li>不能重用最近 5 个使用过的密码</li>
+        <li>不能重用最近 <?= $pwdHistory ?> 个使用过的密码</li>
     </ul>
 </div>
 

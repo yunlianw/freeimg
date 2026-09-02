@@ -218,6 +218,9 @@ class SecurityController
         Response::view('security/password', [
             'user' => AuthService::user(),
             'csrf' => csrf_token(),
+            // v1.3.8: 提示文案和客户端校验跟安全策略设置联动
+            'password_min_length' => (int)config('settings.password_min_length', 10),
+            'password_history_count' => (int)config('settings.password_history_count', 5),
         ], 'main');
     }
 

@@ -32,6 +32,12 @@ class UploadController
         }
         $defaultQuality = $webProfile['code'] ?? 'balanced';
 
+        // v1.3.8: 取全部启用的压缩档（用于上传页 quality 下拉，避免 mega/custom 等档被漏）
+        $allProfiles = \App\Core\Db::fetchAll(
+            'SELECT id, code, name, max_dimension, jpeg_quality, output_format, target_size_kb
+             FROM compression_profiles WHERE enabled = 1 ORDER BY sort_order ASC, id ASC'
+        );
+
         // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
         $browserMode = (string)config('settings.browser_upload_mode', 'browser');
         if (!in_array($browserMode, ['double', 'browser', 'backend'], true)) {
@@ -44,6 +50,7 @@ class UploadController
             'albums'  => $folders,
             'visible_storages' => $visibleStorages,
             'default_quality'  => $defaultQuality,
+            'all_profiles'     => $allProfiles,
             'browser_mode'     => $browserMode,
         ], 'main');
     }

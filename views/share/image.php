@@ -8,7 +8,7 @@ $title = $image['original_name'];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= h($image['original_name']) ?> - FreeImg</title>
+<title><?= h($image['original_name']) ?> - <?= h(brand()) ?></title>
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif; background: #111827; color: #f9fafb; min-height: 100vh; display: flex; flex-direction: column; }

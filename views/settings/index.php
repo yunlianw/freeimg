@@ -59,12 +59,12 @@
         </div>
         <div class="form-group">
             <label>Host 白名单 <span style="color:#999;font-weight:normal;">（每行一个域名）</span></label>
-            <textarea name="allowed_hosts" rows="4" placeholder="pic.5276.net&#10;img.example.com&#10;cdn.example.com"><?= htmlspecialchars($settings['allowed_hosts'] ?? '') ?></textarea>
+            <textarea name="allowed_hosts" rows="4" placeholder="img.example.com&#10;cdn.example.com&#10;img.your-domain.com"><?= htmlspecialchars($settings['allowed_hosts'] ?? '') ?></textarea>
             <div class="hint">
                 💡 <b>多域名模式必填</b>：宝塔多个站点指向同一图床时，必须把所有合法域名都列上（防 Host 头伪造）<br>
                 💡 <b>留空</b>：信任任意请求 Host（仅做字符清洗，不做白名单校验 — 多域名用户必填）<br>
                 💡 <b>格式</b>：每行一个域名，自动补 <code>https://</code>（也可直接写完整 URL）<br>
-                💡 <b>兼容</b>：config/config.php 的 <code>app.allowed_hosts</code> 仍生效（后台优先，v1.3.1 起不推荐）
+                💡 <b>兼容</b>：config/config.php 的 <code>app.allowed_hosts</code> 仍生效（后台优先，不再推荐改配置文件）
             </div>
         </div>
         <div style="display:flex; gap:8px; margin-top:12px;">
@@ -88,7 +88,7 @@
             <select name="default_compression">
                 <?php
                 $opts = ['original' => '原图', 'high' => '高清', 'balanced' => '均衡', 'saver' => '省流', 'extreme' => '极限省流'];
-                $cur = $settings['default_compression'] ?? 'balanced';
+                $cur = $settings['default_compression'] ?? 'saver';  // v1.3.8: 与 Installer seed + 生产环境一致
                 foreach ($opts as $k => $v): ?>
                     <option value="<?= $k ?>" <?= $cur === $k ? 'selected' : '' ?>><?= htmlspecialchars($v) ?></option>
                 <?php endforeach; ?>
@@ -227,7 +227,7 @@
         <div class="form-group">
             <label>默认命名规则</label>
             <select name="rename_rule" id="rename-rule-select">
-                <option value="short" <?= ($settings['rename_rule'] ?? '') === 'short' || empty($settings['rename_rule']) ? 'selected' : '' ?>>随机短名（7 位，默认）</option>
+                <option value="short" <?= ($settings['rename_rule'] ?? '') === 'short' || empty($settings['rename_rule']) ? 'selected' : '' ?>>随机短名（7 位）</option>
                 <option value="timestamp" <?= ($settings['rename_rule'] ?? '') === 'timestamp' ? 'selected' : '' ?>>时间戳（YmdHis + 4 位随机）</option>
                 <option value="original" <?= ($settings['rename_rule'] ?? '') === 'original' ? 'selected' : '' ?>>原文件名</option>
                 <option value="custom" <?= ($settings['rename_rule'] ?? '') === 'custom' ? 'selected' : '' ?>>自定义格式</option>
@@ -249,7 +249,7 @@
         <div class="form-group">
             <label>自动子目录（上传未手动指定目录时生效）</label>
             <select name="dir_rule" id="dir-rule-select">
-                <option value="none" <?= ($settings['dir_rule'] ?? '') === 'none' || empty($settings['dir_rule']) ? 'selected' : '' ?>>无子目录（默认）</option>
+                <option value="none" <?= ($settings['dir_rule'] ?? '') === 'none' || empty($settings['dir_rule']) ? 'selected' : '' ?>>无子目录</option>
                 <option value="year" <?= ($settings['dir_rule'] ?? '') === 'year' ? 'selected' : '' ?>>按年（2026）</option>
                 <option value="month" <?= ($settings['dir_rule'] ?? '') === 'month' ? 'selected' : '' ?>>按年月（2026/08）</option>
                 <option value="day" <?= ($settings['dir_rule'] ?? '') === 'day' ? 'selected' : '' ?>>按年月日（2026/08/29）</option>

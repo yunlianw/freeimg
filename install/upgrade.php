@@ -2,11 +2,12 @@
 /**
  * FreeImg 升级脚本（自动随 install/Installer 触发）
  *
- * 当前版本：v1.3.7
+ * 当前版本：v1.3.8
  * - 清理 v1.1.3 残留的孤儿 settings 行（site_description/default_storage/allow_signup/maintenance_mode）
  * - 幂等：可重复运行，已清理的 key 不会报错
  * - v1.3.5 段：老库补种 url_path_prefix='img'（新装走 seedSettings，无需升级）
  * - v1.3.7 段：v1.3.2 storages /uploads 后缀修复走 decrypt_secret/encrypt_secret（加密配置静默失效修复）
+ * - v1.3.8 段：清理死字段 api_compression_enabled / api_webp_enabled（全项目 0 命中）
  *
  * 触发方式：Installer::createLock() 末尾 require_once
  * 注意：脚本仅清理已知孤儿 key（4 个白名单），无任何敏感操作；install/ 目录本身有 install.lock 守护，重装保护机制已就位。
@@ -163,6 +164,15 @@ try {
         $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES ('url_path_prefix', 'img', 'storage', NOW())");
         $ins->execute();
     }
+} catch (Throwable $e) {
+    // 静默跳过
+}
+
+// v1.3.8: 清理死字段 api_compression_enabled / api_webp_enabled
+// 背景：全项目 0 命中（grep），Installer 也不种，删 settings 行释放空间
+// 幂等：行不存在 DELETE 不会报错
+try {
+    $pdo->exec("DELETE FROM settings WHERE `key` IN ('api_compression_enabled', 'api_webp_enabled')");
 } catch (Throwable $e) {
     // 静默跳过
 }

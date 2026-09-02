@@ -29,7 +29,7 @@ $title = '请输入访问密码';
     <h1>此相册受密码保护</h1>
     <p>请输入访问密码以查看内容</p>
     <?php if ($error): ?><div class="error"><?= h($error) ?></div><?php endif; ?>
-    <form method="POST" action="/s/<?= h($token) ?>">
+    <form method="POST" action="<?= h(share_url('s/' . $token)) ?>">
         <input type="password" name="password" placeholder="访问密码" autofocus required>
         <button type="submit">进入相册</button>
     </form>

@@ -15,10 +15,13 @@
 
     if (!btnScan) return;
 
+    // v1.3.8: 改用 FREEIMG_BASE 替代 window.location.origin，支持子目录部署
+    const FREEIMG_BASE = (window.FREEIMG_BASE || '').replace(/\/+$/, '');
+
     // 每次操作前从 server 拉取最新 CSRF（防止页面停留 token 过期）
     async function getFreshCsrf() {
         try {
-            const res = await fetch(window.location.origin + '/api/csrf', {
+            const res = await fetch(FREEIMG_BASE + '/api/csrf', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin'
             });
@@ -40,7 +43,7 @@
         result.innerHTML = '';
 
         try {
-            const res = await fetch(window.location.origin + '/api/storage/scan', {
+            const res = await fetch(FREEIMG_BASE + '/api/storage/scan', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin'
             });
@@ -67,7 +70,7 @@
             const csrf = await getFreshCsrf();
             const fd = new FormData();
             fd.append('csrf_token', csrf);
-            const res = await fetch(window.location.origin + url, {
+            const res = await fetch(FREEIMG_BASE + url, {
                 method: 'POST',
                 body: fd,
                 credentials: 'same-origin'
@@ -106,7 +109,7 @@
                 const fd2 = new FormData();
                 fd2.append('csrf_token', csrf2);
                 fd2.append('confirm', 'I_UNDERSTAND');
-                const res2 = await fetch(window.location.origin + url, {
+                const res2 = await fetch(FREEIMG_BASE + url, {
                     method: 'POST',
                     body: fd2,
                     credentials: 'same-origin'

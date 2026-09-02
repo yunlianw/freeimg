@@ -323,6 +323,15 @@ function api_url(string $path = ''): string
 }
 
 /**
+ * 站点品牌名（v1.3.8）
+ * 全站统一读 settings.site_name，改站点名后生效
+ */
+function brand(): string
+{
+    return (string)(config('settings.site_name') ?: 'FreeImg');
+}
+
+/**
  * 随机字符串
  */
 function random_string(int $length = 32): string

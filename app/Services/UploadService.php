@@ -83,7 +83,7 @@ class UploadService
             }
         }
 
-        $qualityLevel = $opts['quality'] ?? (config('settings.default_compression') ?: 'balanced');
+        $qualityLevel = $opts['quality'] ?? (config('settings.default_compression') ?: 'saver');  // v1.3.8: 与 Installer seed 一致
         // 本次实际使用的压缩档代码（写库 compression 字段）：
         // 有 profile → 用 profile.code；否则用 quality 档代码（original/saver/extreme/ultra...）
         $compressionCode = !empty($opts['_compression_profile'])

@@ -8,7 +8,7 @@
     </button>
 </div>
 
-<input type="hidden" id="freeimg-csrf" value="<?= h($csrf) ?>">
+<input type="hidden" id="freeimg-csrf" value="<?= h($csrf) ?>" data-prefix="<?= h(config('settings.url_path_prefix') ?? 'img') ?>" data-base="<?= h(base_url()) ?>">
 
 <!-- 上传配置区（roim-picx 风格：6 控件 3 列网格）-->
 <div class="config-collapse-wrapper" id="config-wrapper">
@@ -25,7 +25,7 @@
                     <input type="text" id="custom-path" placeholder="或输入子目录" class="config-input">
                 </div>
                 <div class="config-hint">
-                    路径：<code>img/&lt;这里填的&gt;</code>，默认前缀 <code>img/</code> 在后台设置
+                    路径：<code><?= h((string)config('settings.url_path_prefix', 'img')) ?>/&lt;这里填的&gt;</code>，默认前缀在后台「设置 → 存储」修改
                 </div>
             </div>
 
@@ -57,13 +57,31 @@
             <!-- 4. 图片压缩 -->
             <div class="config-item">
                 <label class="config-label">📐 图片压缩</label>
-                <?php $dq = $default_quality ?? 'balanced'; ?>
+                <?php
+                $dq = $default_quality ?? 'balanced';
+                // v1.3.8: 从 DB compression_profiles 渲染全部档位（避免 mega/custom 静默变 original）
+                $allProfiles = $all_profiles ?? [];
+                ?>
                 <select name="quality" id="quality-select" class="config-input">
-                    <option value="original" <?= $dq === 'original' ? 'selected' : '' ?>>原图（不压缩）</option>
-                    <option value="high" <?= $dq === 'high' ? 'selected' : '' ?>>高清 (2048px / 0.85)</option>
-                    <option value="balanced" <?= $dq === 'balanced' ? 'selected' : '' ?>>⭐ 均衡 (1600px / 0.70) · ≤2MB</option>
-                    <option value="saver" <?= $dq === 'saver' ? 'selected' : '' ?>>省流 (1200px / 0.55) · ≤1MB</option>
-                    <option value="extreme" <?= $dq === 'extreme' ? 'selected' : '' ?>>极限省流 (900px / 0.40) · ≤0.5MB</option>
+                    <?php foreach ($allProfiles as $p): ?>
+                        <?php
+                            $dim = (int)($p['max_dimension'] ?? 0);
+                            $qual = (int)($p['jpeg_quality'] ?? 0);
+                            $sizeKb = (int)($p['target_size_kb'] ?? 0);
+                            $sizeStr = $sizeKb > 0 ? ' · ≤' . round($sizeKb/1024, 1) . 'MB' : '';
+                            $dimStr = $dim > 0 ? "{$dim}px" : '原尺寸';
+                            $label = $p['name'] . ' (' . $dimStr . ' / q' . $qual . ')' . $sizeStr;
+                            if ((int)($p['is_builtin'] ?? 0) === 0) $label .= ' · 自定义';
+                            // v1.3.8 虾二号反馈 FAIL-1: 把 DB 参数塞进 data-* 让前端读
+                            $mime = ($p['output_format'] ?? 'auto') === 'auto' ? 'image/jpeg' : 'image/' . $p['output_format'];
+                            $qF = round($qual / 100, 2);  // 0.85 / 0.70 / 0.55 / 0.45
+                        ?>
+                        <option value="<?= h($p['code']) ?>"
+                                data-maxdim="<?= $dim ?>"
+                                data-quality="<?= $qF ?>"
+                                data-mime="<?= h($mime) ?>"
+                                <?= $dq === $p['code'] ? 'selected' : '' ?>><?= h($label) ?></option>
+                    <?php endforeach; ?>
                 </select>
                 <div class="config-hint">默认档来自后台「压缩配置 → Web 默认档」设置</div>
             </div>
@@ -138,7 +156,7 @@
                     </label>
                     <span class="switch-label">💧 图片水印</span>
                 </div>
-                <div class="config-hint">启用水印（Phase 3 实现）</div>
+                <div class="config-hint">开启后为上传图片添加水印（可在后台 → 设置 → 水印配置参数）</div>
             </div>
 
             <!-- 8. 访问权限 -->
@@ -163,7 +181,7 @@
             <div class="dropzone-inner">
                 <div class="dropzone-icon">📥</div>
                 <p class="title">拖拽图片到此处，或点击选择</p>
-                <p class="hint">支持 JPG / PNG / GIF / WebP / BMP · 浏览器自动压缩</p>
+                <p class="hint">支持 <?= h(strtoupper(str_replace(',', ' / ', (string)config('settings.upload_allowed_types', 'jpg,jpeg,png,gif,webp,bmp')))) ?> · 浏览器自动压缩</p>
                 <input type="file" id="file-input" multiple accept="image/*" hidden>
             </div>
         </div>

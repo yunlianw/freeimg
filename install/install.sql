@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS `images` (
   `original_mime` varchar(32) DEFAULT NULL COMMENT '原始文件真实 MIME（detectMime 检测）',
   `original_extension` varchar(16) DEFAULT NULL COMMENT '原始扩展名（取自上传文件名）',
   `compressor` varchar(16) DEFAULT NULL COMMENT '压缩器：pngquant / gd / cwebp / original',
-  `compression` varchar(32) DEFAULT NULL COMMENT '压缩档代码：original / high / balanced / saver / extreme / ultra（force_recompress 时同 sha256 可多记录）',
+  `compression` varchar(32) DEFAULT NULL COMMENT '压缩档代码：original / high / balanced / saver / mega / custom（force_recompress 时同 sha256 可多记录）',
   `compression_source` varchar(16) DEFAULT NULL COMMENT '压缩源：browser / api-server / none（未压缩）',
   `sha256` varchar(64) NOT NULL,
   `storage_path` varchar(512) NOT NULL,

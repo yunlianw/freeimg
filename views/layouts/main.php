@@ -9,7 +9,7 @@ $currentPath = $_SERVER['REQUEST_URI'] ?? '/';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= htmlspecialchars(($title ?? '控制台') . ' - ' . (config('settings.site_name') ?: 'FreeImg')) ?></title>
+<title><?= htmlspecialchars(($title ?? '控制台') . ' - ' . brand()) ?></title>
 <link rel="stylesheet" href="/assets/style.css?v=<?= @filemtime(FREEIMG_ROOT . '/public/assets/style.css') ?: time() ?>">
 </head>
 <body>
@@ -20,7 +20,7 @@ $currentPath = $_SERVER['REQUEST_URI'] ?? '/';
         </button>
         <a href="<?= base_url('dashboard') ?>" class="brand">
             <div class="brand-icon">🖼️</div>
-            <span class="brand-text">FreeImg</span>
+            <span class="brand-text"><?= h(brand()) ?></span>
         </a>
         <nav class="topnav">
             <a href="<?= base_url('dashboard') ?>" class="<?= str_contains($currentPath, 'dashboard') ? 'active' : '' ?>">控制台</a>

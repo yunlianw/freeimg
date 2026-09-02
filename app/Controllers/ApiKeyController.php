@@ -25,10 +25,17 @@ class ApiKeyController
         $keys = $repo->listByUser((int)$user['id']);
         $profileRepo = new CompressionProfileRepository();
         $profiles = $profileRepo->listEnabled();
+        // v1.3.8: API 默认档（api_compression_profile_id）传给 view 用于默认选中
+        $apiDefaultId = (int)config('settings.api_compression_profile_id', 0);
+        $apiDefault = null;
+        if ($apiDefaultId > 0) {
+            $apiDefault = $profileRepo->find($apiDefaultId);
+        }
         Response::view('api_keys/index', [
-            'keys'      => $keys,
-            'profiles'  => $profiles,
-            'csrf'      => csrf_token(),
+            'keys'       => $keys,
+            'profiles'   => $profiles,
+            'api_default_code' => $apiDefault['code'] ?? 'saver',  // v1.3.8: 默认 saver（与 Installer 一致）
+            'csrf'       => csrf_token(),
         ], 'main');
     }
 

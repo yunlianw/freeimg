@@ -20,7 +20,7 @@
         <div class="form-group">
             <label>邮箱</label>
             <input type="email" name="email" value="<?= h($user['email']) ?>" required>
-            <div class="hint">可用于密码找回（功能开发中）</div>
+            <div class="hint">用于账户通知、找回密码等（暂未开放密码找回）</div>
         </div>
         <div class="form-group">
             <label>角色</label>

@@ -51,7 +51,7 @@ $canonical = share_url('s/' . urlencode($folder['share_token']));
     <div class="grid">
         <?php foreach ($list as $img): ?>
             <div class="card">
-                <a href="/s/img/<?= h($img['uuid']) ?>" target="_blank">
+                <a href="<?= h(share_url('s/img/' . $img['uuid'])) ?>" target="_blank">
                     <img src="<?= h($img['public_url']) ?>" alt="<?= h($img['original_name']) ?>" loading="lazy">
                 </a>
                 <div class="meta">
@@ -63,7 +63,7 @@ $canonical = share_url('s/' . urlencode($folder['share_token']));
     </div>
 <?php endif; ?>
 
-<div class="footer">图片由 FreeImg 图床提供</div>
+<div class="footer">图片由 <?= h(brand()) ?> 图床提供</div>
 <script>
 function copyUrl() {
     var el = document.getElementById('share-url');

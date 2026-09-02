@@ -19,9 +19,15 @@ class CompressionProfileRepository
 
     public function findByCode(string $code): ?array
     {
-        // 向后兼容：small 已更名 saver（同一档位）
-        if ($code === 'small') {
-            $code = 'saver';
+        // v1.3.8: 向后兼容别名映射
+        // - small → saver（老档位名）
+        // - extreme → mega（极限压缩档老名，跟前端 QUALITY_PRESETS/旧文档一致）
+        $aliases = [
+            'small'   => 'saver',
+            'extreme' => 'mega',
+        ];
+        if (isset($aliases[$code])) {
+            $code = $aliases[$code];
         }
         return Db::fetchOne('SELECT * FROM compression_profiles WHERE code = :c', ['c' => $code]);
     }

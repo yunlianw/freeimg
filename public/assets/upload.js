@@ -38,6 +38,9 @@
     const clearPendingBtn = document.getElementById('clear-pending-btn');
     const clearResultsBtn = document.getElementById('clear-results');
     const csrfInput = document.getElementById('freeimg-csrf');
+    // v1.3.8: 改用 FREEIMG_BASE 替代 window.location.origin，支持子目录部署
+    const FREEIMG_BASE = ((csrfInput && csrfInput.dataset.base) || window.FREEIMG_BASE || '').replace(/\/+$/, '');
+    const urlPathPrefix = (csrfInput && csrfInput.dataset.prefix) || 'img';
     const customPathInput = document.getElementById('custom-path');
     const publicCheckbox = document.getElementById('is-public');
     // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
@@ -115,7 +118,22 @@
      */
     async function recomputeItem(item, preset) {
         item.currentPreset = preset;
-        const presetCfg = QUALITY_PRESETS[preset] || QUALITY_PRESETS.balanced;
+        // v1.3.8 虾二号反馈 FAIL-1: 优先读 option dataset（DB 真实参数），没有才用 QUALITY_PRESETS fallback
+        let presetCfg;
+        const sel = document.getElementById('quality-select');
+        if (sel) {
+            const opt = Array.from(sel.options).find(o => o.value === preset);
+            if (opt && opt.dataset.maxdim !== undefined) {
+                presetCfg = {
+                    maxDim: parseInt(opt.dataset.maxdim, 10) || 0,
+                    quality: parseFloat(opt.dataset.quality) || 0.7,
+                    mime: opt.dataset.mime || 'image/jpeg',
+                };
+            }
+        }
+        if (!presetCfg) {
+            presetCfg = QUALITY_PRESETS[preset] || QUALITY_PRESETS.balanced;
+        }
         try {
             // Phase 9.3: 仅后端压缩模式 → 前端不压缩，原图直传
             if (isBackendOnly) {
@@ -289,7 +307,7 @@
             if (expireAt) fd.append('expires_at', expireAt);
 
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', window.location.origin + '/upload');
+            xhr.open('POST', FREEIMG_BASE + '/upload');
             xhr.upload.onprogress = e => {
                 if (e.lengthComputable) {
                     const pct = (e.loaded / e.total) * 100;
@@ -411,8 +429,7 @@
                 try {
                     const fd = new FormData();
                     fd.append('csrf_token', csrfInput.value);
-                    const baseClean = window.location.origin.replace(/\/+$/, '');
-                    const res = await fetch(baseClean + '/images/' + id + '/destroy', {
+                    const res = await fetch(FREEIMG_BASE + '/images/' + id + '/destroy', {
                         method: 'POST',
                         body: fd,
                         credentials: 'same-origin'
@@ -562,7 +579,7 @@
     // 页面加载时拉取 img/ 下的真实子目录（从后端 /api/storage/dirs）
     async function loadDirs() {
         try {
-            const res = await fetch(window.location.origin + '/api/storage/dirs?prefix=img', {
+            const res = await fetch(FREEIMG_BASE + '/api/storage/dirs?prefix=' + encodeURIComponent(urlPathPrefix), {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
             const data = await res.json();

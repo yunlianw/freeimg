@@ -1,11 +1,11 @@
 <link rel="stylesheet" href="<?= htmlspecialchars(base_url('assets/api-keys.css')) ?>?v=<?= filemtime(FREEIMG_ROOT . '/public/assets/api-keys.css') ?>">
 <script>window.FREEIMG_CSRF = "<?= htmlspecialchars($csrf) ?>";</script>
-<script src="<?= htmlspecialchars(base_url('assets/api-keys.js')) ?>?v=20260901" defer></script>
+<script src="<?= htmlspecialchars(base_url('assets/api-keys.js')) ?>?v=<?= @filemtime(FREEIMG_ROOT . '/public/assets/api-keys.js') ?: time() ?>" defer></script>
 
 <div class="page-header">
     <div>
         <h1>🔑 API 密钥</h1>
-        <p class="subtitle">为每个调用方创建独立密钥（PicGo / ShareX / 帝国CMS / AutoShop…）</p>
+        <p class="subtitle">为每个调用方创建独立密钥（PicGo / ShareX / Typora 等）</p>
     </div>
     <div style="display:flex; gap:8px;">
         <a href="<?= base_url('settings') ?>" class="btn-ghost">⚙️ 设置</a>
@@ -33,9 +33,13 @@
                 <div class="api-debug-field api-debug-compression">
                     <label>🎚️ 压缩档位（同步 /compression 配置）</label>
                     <select name="compression" id="api-debug-compression">
+                        <?php
+                            // v1.3.8: 默认选中 api_compression_profile_id 对应档（不再写死 balanced）
+                            $apiDefault = (string)($api_default_code ?? 'saver');
+                        ?>
                         <?php foreach ($profiles as $p): ?>
                             <option value="<?= htmlspecialchars($p['code']) ?>"
-                                <?= $p['code'] === 'balanced' ? 'selected' : '' ?>>
+                                <?= $p['code'] === $apiDefault ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($p['name']) ?>
                                 (<?= (int)$p['max_dimension'] ?>px / <?= strtoupper($p['output_format'] ?? 'auto') ?> q<?= (int)$p['jpeg_quality'] ?>)
                             </option>
@@ -273,12 +277,12 @@
     <div class="security-banner-body">
         <strong>压缩档位优先级（API 上传时）</strong>
         <ol style="margin:6px 0 0 18px;padding:0;font-size:13px;line-height:1.8;color:#1e3a8a;">
-            <li><strong>API 调用参数</strong> <code style="background:#fff;padding:1px 6px;border-radius:3px;font-size:11px;">compression=extreme</code> （最高，可临时覆盖）</li>
+            <li><strong>API 调用参数</strong> <code style="background:#fff;padding:1px 6px;border-radius:3px;font-size:11px;">compression=mega</code> （最高，可临时覆盖）</li>
             <li><strong>本 Key 绑定的预设</strong> 创建 Key 时选的压缩档（固定）</li>
             <li><strong>后台"压缩配置 → API 默认档"</strong>（fallback）</li>
         </ol>
         <div style="margin-top:6px;font-size:12px;color:#1e40af;">
-            💡 例：本 Key 绑定 <code style="background:#fff;padding:1px 5px;border-radius:3px;">small</code>，但调用时传 <code style="background:#fff;padding:1px 5px;border-radius:3px;">compression=extreme</code>，则本次上传按 <strong>extreme</strong> 压缩
+            💡 例：本 Key 绑定 <code style="background:#fff;padding:1px 5px;border-radius:3px;">saver</code>，但调用时传 <code style="background:#fff;padding:1px 5px;border-radius:3px;">compression=mega</code>，则本次上传按 <strong>mega</strong> 压缩（也支持 <code>extreme</code> 别名）
         </div>
     </div>
 </div>
@@ -347,7 +351,7 @@ $activeCount = count(array_filter($visibleKeys, fn($k) => (int)$k['status'] === 
         <div class="form-row">
             <div class="form-cell form-cell-grow">
                 <label>名称 <span class="form-hint">（用途说明，方便管理）</span></label>
-                <input type="text" name="name" required maxlength="64" placeholder="例如：PicGo 笔记本 / 帝国CMS 站点 / AutoShop 商城">
+                <input type="text" name="name" required maxlength="64" placeholder="例如：PicGo 笔记本 / ShareX 桌面 / Typora 写作">
             </div>
             <div class="form-cell">
                 <label>压缩预设</label>
@@ -381,7 +385,7 @@ $activeCount = count(array_filter($visibleKeys, fn($k) => (int)$k['status'] === 
         <div class="empty-state">
             <div class="empty-icon">🔑</div>
             <h3>还没有密钥</h3>
-            <p>创建第一个密钥给第三方程序使用（PicGo、ShareX、帝国CMS 等）</p>
+            <p>创建第一个密钥给第三方程序使用（PicGo、ShareX、Typora 等）</p>
         </div>
     <?php else: ?>
         <div class="key-list">
