@@ -16,6 +16,24 @@ use App\Middleware\AuthMiddleware;
 class StorageScanController
 {
     /**
+     * 从 storages 表拿所有 local 驱动的真实 basePath（解密 config）
+     * 不再硬编码目录 — 改 prefix 时也能扫到所有真实图片
+     */
+    private function localBaseDirs(): array
+    {
+        $rows = Db::fetchAll('SELECT config FROM storages WHERE driver = "local" AND status = 1');
+        $dirs = [];
+        foreach ($rows as $row) {
+            $cfg = json_decode(decrypt_secret($row['config']), true) ?: [];
+            $p = $cfg['path'] ?? '';
+            if ($p === '') continue;
+            if ($p[0] !== '/') $p = FREEIMG_ROOT . '/' . $p;  // 与 LocalStorage 同样处理相对路径
+            $dirs[rtrim($p, '/')] = true;                     // 去重
+        }
+        return array_keys($dirs) ?: [FREEIMG_ROOT . '/public']; // 兜底
+    }
+
+    /**
      * GET /api/storage/scan
      * 扫描结果（JSON）
      */
@@ -27,14 +45,9 @@ class StorageScanController
             Response::json(['success' => false, 'message' => '需要管理员权限'], 403);
         }
 
-        // 扫两个根目录（兼容历史目录结构）：
-        // 1) public/storage/images/ — 代码上传目标（最近）
-        // 2) public/{prefix}/ — 历史路径（nginx alias 仍服务）
-        $baseDirs = [FREEIMG_ROOT . '/public/storage/images'];
-        $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/'); // 单级 prefix（img/cdn），多级（rest/new）会被剥斜杠
-        $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
-        if ($prefix === '') $prefix = 'img';
-        $baseDirs[] = FREEIMG_ROOT . '/public/' . $prefix;
+        // 从 storages 表读真实 basePath（v1.3.6: 不再硬编码 public/{prefix}，改 prefix 也能扫到）
+        $baseDirs = $this->localBaseDirs();
+        $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/'); // 提示用：当前 prefix 值（支持多级如 img/tu）
 
         // 扫描磁盘所有图片文件
         $filesOnDisk = [];
@@ -48,6 +61,8 @@ class StorageScanController
                 if ($file->isFile() && preg_match('/\.(jpe?g|png|gif|webp|bmp)$/i', $file->getFilename())) {
                     $rel = substr($file->getPathname(), strlen($baseDir) + 1);
                     $rel = str_replace('\\', '/', $rel);
+                    // v1.3.7: 跳过 storage/ 目录（watermark/logo.png 等运行时文件不是用户图，不应被认孤儿）
+                    if (str_starts_with($rel, 'storage/') || str_contains($rel, '/storage/')) continue;
                     $info = [
                         'path'  => $rel,
                         'size'  => $file->getSize(),
@@ -113,7 +128,7 @@ class StorageScanController
 
         Response::json([
             'success' => true,
-            'baseDir' => $baseDir,
+            'baseDirs' => $baseDirs,  // v1.3.7: 改成数组（原 baseDir 多个 baseDir 时只报最后一个，且目录都不存在时未定义）
             'prefix'  => $prefix,
             'stats'   => [
                 'files'    => count($filesOnDisk),
@@ -147,12 +162,9 @@ class StorageScanController
         // 二次确认：必须传 confirm=I_UNDERSTAND 才真删（防误操作）
         $confirm = $request->post('confirm', '');
 
-        // 扫两个根目录（与 scan 一致：public/storage/images + public/{prefix}）
-        $baseDirs = [FREEIMG_ROOT . '/public/storage/images'];
+        // 从 storages 表读真实 basePath（与 scan 一致）
+        $baseDirs = $this->localBaseDirs();
         $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/');
-        $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
-        if ($prefix === '') $prefix = 'img';
-        $baseDirs[] = FREEIMG_ROOT . '/public/' . $prefix;
         if (!array_filter($baseDirs, 'is_dir')) {
             Response::json(['success' => true, 'deleted' => 0]);
         }
@@ -182,6 +194,9 @@ class StorageScanController
 
                 $rel = substr($file->getPathname(), strlen($baseDir) + 1);
                 $rel = str_replace('\\', '/', $rel);
+
+                // v1.3.7: 跳过 storage/ 目录（watermark/logo.png 是运行时文件，不应被认孤儿）
+                if (str_starts_with($rel, 'storage/') || str_contains($rel, '/storage/')) continue;
 
                 if (isset($dbPaths[$rel])) {
                     $skipped++;
@@ -244,12 +259,15 @@ class StorageScanController
         }
 
         $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/');
-        $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
-        if ($prefix === '') $prefix = 'img';
 
-        // 扫两个根目录（与 scan 一致）
-        $baseDirs = [FREEIMG_ROOT . '/public/storage/images'];
-        $baseDirs[] = FREEIMG_ROOT . '/public/' . $prefix;
+        // 从 storages 表读真实 basePath（与 scan 一致）
+        $baseDirs = $this->localBaseDirs();
+
+        // v1.3.7: 目录不存在守卫（与 cleanup 一致），避免 storages.path 配错/目录被删时
+        // 全部 active 记录被误判孤儿 → 批量误删
+        if (!array_filter($baseDirs, 'is_dir')) {
+            Response::json(['success' => true, 'deleted' => 0, 'message' => '存储目录不存在，已跳过']);
+        }
 
         // 拿到磁盘上所有图片路径（与 scan 保持一致：包含 prefix 与裸路径两种 key）
         $diskFiles = [];

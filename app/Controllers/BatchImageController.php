@@ -36,7 +36,7 @@ class BatchImageController
 
         $repo = new ImageRepository();
         $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/');
-        $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
+        $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
 
         $ok = 0; $fail = 0; $errors = [];
         foreach ($ids as $id) {
@@ -87,7 +87,7 @@ class BatchImageController
 
         $repo = new ImageRepository();
         $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/');
-        $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
+        $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
 
         // 找当前用户所有回收站图片
         $rows = \App\Core\Db::fetchAll(

@@ -11,6 +11,60 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.3.7] - 2026-09-02
+
+### 🐛 BUG 修复：存储扫描彻底修对 + url_path_prefix 支持多级
+
+老季要求「默认 img / 改成 tu / 改成 img/tu 都能扫到所有真实图片，不出现文件对不上」，龙虾二号推荐 C 方案（修扫描器）+ 牛马一号 + 龙虾二号一致同意 prefix 允许多级。本轮落地：
+
+**url_path_prefix 全面支持多级**（8 个文件）：
+- 12 处 `preg_replace('/[^a-zA-Z0-9_-]/', ...)` → `'/[^a-zA-Z0-9\/_-]/'`（保留 `/`）
+- SettingController 校验增加 `..` 和 `//` 安全守卫（防路径穿越/空段）
+- 默认值 fallback `rest/new` → `img`（老季朋友新装走 fallback 错误修复）
+- views 提示文案加单级 + 多级各一个示例
+
+**存储扫描逻辑彻底修对**（StorageScanController）：
+- 新增 `localBaseDirs()`：从 storages 表读所有 local 驱动的真实 basePath（解密 config）
+- scan / cleanup / cleanupRecords 三处都用 `localBaseDirs()`，不再硬编码 `public/{prefix}`
+- cleanupRecords 加 is_dir 守卫（虾二号找出的**数据风险**）：防止 storages.path 配错时批量误删 active 记录
+- scan 响应 `baseDir`（单数，未定义变量）→ `baseDirs`（数组）
+- **跳过 storage/ 目录**：watermark/logo.png 是运行时文件，不应被认成孤儿文件
+
+**附带 bug 修复**：
+- upgrade.php v1.3.2 段 `json_decode($row['config'])` 没走 `decrypt_secret`，导致 storages.config（AES-GCM 加密）的 /uploads 后缀修复**对加密配置静默失效**。改为 `json_decode(decrypt_secret(...))`，写回用 `encrypt_secret(...)`，并 require_once functions.php
+- Installer.php:126 注释「仅支持单级」→「v1.3.6: 支持多级」
+
+**验证**（生产库 pic_5276_net 实测）：
+- DB 19 张图 / 磁盘 20 文件 → 孤儿记录 0 / 孤儿文件 0（修复前是 1 个 watermark logo 误判）
+- `url_path_prefix=img` 已种，新装走 seedSettings='img'
+- 老库升级：手动跑 `php install/upgrade.php` 安全（解密不抛异常，/uploads 零命中零写入）
+
+**审查**：龙虾二号 2 分钟最终审查全 PASS（4 项修复 + 加密 bug + storage/ 排除）
+
+---
+
+## [v1.3.6] - 2026-09-02
+
+中间过渡版，与 v1.3.7 合并发布（跳过单独 release tag）。
+
+---
+
+## [v1.3.5] - 2026-09-02
+
+### 🐛 BUG 修复：url_path_prefix 默认值与开发环境不一致
+
+老季要求「新装版本跟我一样」，虾二号端到端对比找出：
+- 老季本机 `url_path_prefix=img`，新装 placeholder `rest/new`（错的）
+- fix：`views/settings/index.php` placeholder `img`，fallback `img`
+- 新增 `install/Installer.php::seedSettings()` 显式种子 `url_path_prefix=img`
+- 新增 `install/upgrade.php` v1.3.5 段，老库 INSERT IGNORE `url_path_prefix=img`
+
+**审查**：虾二号端到端对比 + PASS。
+
+> 注：v1.3.5 一度改为"严格单级"（拒绝斜杠），v1.3.6 又改回"允许多级"（保留斜杠）。最终设计是支持多级（默认 `img`），用户可改单级（如 `tu`）或多级（如 `img/tu`）。
+
+---
+
 ## [v1.3.4] - 2026-09-02
 
 ### 🐛 BUG 修复：全新安装默认值与生产环境不一致

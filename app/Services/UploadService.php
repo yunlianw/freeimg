@@ -149,7 +149,7 @@ class UploadService
         $ext = $format ?: $imageInfo['extension'];
 
         $prefix = trim((string)(config('settings.url_path_prefix') ?: 'img'), '/');
-        $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix); // 保留斜杠（支持多级前缀如 rest/new）
+        $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix); // 支持多级目录（如 img/tu）
         if ($prefix === '') $prefix = 'img';
 
         $subdir = trim((string)($opts['subdir'] ?? ''), '/');

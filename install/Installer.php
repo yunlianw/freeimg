@@ -122,6 +122,9 @@ class Installer
             ['dir_rule', 'month', 'image'],
             // v1.3.4: 显式种子重命名规则
             ['rename_rule', 'short', 'image'],
+            // v1.3.5: URL 路径前缀（与开发环境一致，'img' = 单级目录名）
+            // v1.3.6: 支持多级（如 img/tu）。LocalStorage::setPrefix 正则已改为保留斜杠
+            ['url_path_prefix', 'img', 'storage'],
         ];
         $stmt = $this->pdo->prepare("INSERT IGNORE INTO settings (`key`, `value`, `group`, created_at) VALUES (?, ?, ?, NOW())");
         foreach ($defaults as $s) {

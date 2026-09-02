@@ -40,7 +40,8 @@ class LocalStorage implements StorageDriverInterface
      */
     public function setPrefix(string $prefix): void
     {
-        $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
+        // 支持多级目录（如 img/tu）
+        $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
         $this->prefix = $prefix ?? '';
     }
 

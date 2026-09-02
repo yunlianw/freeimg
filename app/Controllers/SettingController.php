@@ -140,14 +140,19 @@ class SettingController
                 $value = implode("\n", $clean);
             }
 
-            // 路径前缀特殊校验：只允许字母/数字/斜杠/下划线/短横线
+            // 路径前缀特殊校验：支持多级目录（字母/数字/下划线/短横线/斜杠）
             if ($key === 'url_path_prefix') {
                 $value = trim($value, '/');
                 if (!preg_match('/^[a-zA-Z0-9\/_-]*$/', $value)) {
-                    flash('error', 'URL 路径前缀格式不正确（只允许字母、数字、斜杠、下划线、短横线）');
+                    flash('error', 'URL 路径前缀格式不正确（只允许字母、数字、下划线、短横线、斜杠）');
                     Response::redirect(base_url('settings'));
                 }
-                if ($value === '') $value = 'rest/new';
+                // 防止路径穿越（..）和空段（img//tu → img/tu 兜底）
+                if (str_contains($value, '..') || str_contains($value, '//')) {
+                    flash('error', 'URL 路径前缀不允许包含 .. 或连续斜杠');
+                    Response::redirect(base_url('settings'));
+                }
+                if ($value === '') $value = 'img';
             }
 
             // 重命名规则白名单 + 格式长度限制
@@ -240,7 +245,7 @@ class SettingController
      */
     private function syncPrefixSymlink(string $prefix): void
     {
-        // 校验：只允许字母/数字/斜杠/下划线/短横线（支持多级前缀如 rest/new）
+        // 校验：只允许字母/数字/下划线/短横线/斜杠（支持多级如 img/tu）
         $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
         if ($prefix === '') return;
 

@@ -56,7 +56,7 @@ class ImageController
     private function scanPhysicalDirs(): array
     {
         $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/');
-        $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
+        $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
         if ($prefix === '') $prefix = 'img';
 
         $baseDir = FREEIMG_ROOT . '/public/' . $prefix;
@@ -213,7 +213,7 @@ class ImageController
             // 给 LocalStorage 设置 prefix（如果图片来自 Local 存储）
             if ($driver instanceof \App\Drivers\LocalStorage) {
                 $prefix = trim((string)(\config('settings.url_path_prefix') ?: 'img'), '/');
-                $prefix = preg_replace('/[^a-zA-Z0-9_-]/', '', $prefix);
+                $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
                 if ($prefix !== '') $driver->setPrefix($prefix);
             }
             $fileDeleted = $driver->delete($img['storage_path']);

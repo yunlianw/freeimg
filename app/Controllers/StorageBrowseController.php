@@ -16,7 +16,7 @@ class StorageBrowseController
     {
         AuthMiddleware::handle();
         $user = AuthService::user();
-        // 安全：prefix 只允许字母/数字/斜杠/下划线/短横线，禁止 .. 路径穿越
+        // 安全：prefix 只允许字母/数字/下划线/短横线/斜杠（支持多级如 img/tu），禁止 .. 路径穿越
         $prefix = trim((string)($_GET['prefix'] ?? ''), '/');
         $prefix = preg_replace('/[^a-zA-Z0-9\/_-]/', '', $prefix);
         if (str_contains($prefix, '..')) {

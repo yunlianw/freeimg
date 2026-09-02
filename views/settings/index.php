@@ -215,11 +215,9 @@
         <div class="field-group-title">💾 存储</div>
         <div class="form-group">
             <label>URL 路径前缀</label>
-            <input type="text" name="url_path_prefix" value="<?= htmlspecialchars($settings['url_path_prefix'] ?? 'rest/new') ?>" placeholder="rest/new">
+            <input type="text" name="url_path_prefix" value="<?= htmlspecialchars($settings['url_path_prefix'] ?? 'img') ?>" placeholder="img">
             <div class="hint">
-                图片存储路径格式：<code>{前缀}/{uuid}.{ext}</code><br>
-                示例：<code>rest/new</code> → <code>https://yourdomain.com/uploads/rest/new/abc123.jpg</code><br>
-                留空使用默认 <code>rest/new</code>，仅允许字母、数字、斜杠、下划线、短横线
+                图片 URL 路径前缀（支持多级）。默认 <code>img</code>，单级示例：<code>tu</code> → <code>https://yourdomain.com/tu/2026/09/abc123.jpg</code>；多级示例：<code>img/tu</code> → <code>https://yourdomain.com/img/tu/2026/09/abc123.jpg</code>
             </div>
         </div>
     </div>

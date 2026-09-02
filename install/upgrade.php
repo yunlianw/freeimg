@@ -2,9 +2,11 @@
 /**
  * FreeImg 升级脚本（自动随 install/Installer 触发）
  *
- * 当前版本：v1.3.2
+ * 当前版本：v1.3.7
  * - 清理 v1.1.3 残留的孤儿 settings 行（site_description/default_storage/allow_signup/maintenance_mode）
  * - 幂等：可重复运行，已清理的 key 不会报错
+ * - v1.3.5 段：老库补种 url_path_prefix='img'（新装走 seedSettings，无需升级）
+ * - v1.3.7 段：v1.3.2 storages /uploads 后缀修复走 decrypt_secret/encrypt_secret（加密配置静默失效修复）
  *
  * 触发方式：Installer::createLock() 末尾 require_once
  * 注意：脚本仅清理已知孤儿 key（4 个白名单），无任何敏感操作；install/ 目录本身有 install.lock 守护，重装保护机制已就位。
@@ -15,6 +17,9 @@ if (!defined('FREEIMG_ROOT')) {
 }
 
 $config = require FREEIMG_ROOT . '/config/config.php';
+
+// v1.3.7: 加载 helpers（encrypt_secret/decrypt_secret 是 v1.3.7 修复 v1.3.2 段 storages 加密 config 用的）
+require_once FREEIMG_ROOT . '/app/Helpers/functions.php';
 
 try {
     $dsn = sprintf(
@@ -127,13 +132,15 @@ try {
 try {
     $stmt = $pdo->query("SELECT id, config FROM storages WHERE driver = 'local'");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $cfg = json_decode($row['config'], true);
+        // v1.3.7: storages.config 是加密的，必须先 decrypt_secret 再 json_decode
+        // 否则 v1.3.2 这段修复对加密存储静默失效（所有 /uploads 后缀都没被处理）
+        $cfg = json_decode(decrypt_secret($row['config']), true);
         if (!is_array($cfg)) continue;
         $url = $cfg['url'] ?? '';
         // 只匹配以 /uploads 结尾的（避免误伤用户自定义的 url）
         if (preg_match('#^(https?://[^/]+)/uploads$#', $url, $m)) {
             $cfg['url'] = $m[1];
-            $newConfig = json_encode($cfg, JSON_UNESCAPED_SLASHES);
+            $newConfig = encrypt_secret(json_encode($cfg, JSON_UNESCAPED_SLASHES));
             $upd = $pdo->prepare("UPDATE storages SET config = :c WHERE id = :id");
             $upd->execute([':c' => $newConfig, ':id' => $row['id']]);
         }
@@ -145,4 +152,17 @@ try {
 // 记录升级日志（可选）
 if ($deleted > 0) {
     error_log('[FreeImg upgrade v1.1.4-alpha] Cleaned ' . $deleted . ' orphan settings rows');
+}
+
+// v1.3.5: 老库补种 url_path_prefix（之前没种子，新装走 fallback 'rest/new' 错误）
+// 与开发环境一致：'img'（单级目录名）
+try {
+    $check = $pdo->prepare('SELECT COUNT(*) FROM settings WHERE `key` = :k');
+    $check->execute([':k' => 'url_path_prefix']);
+    if ((int)$check->fetchColumn() === 0) {
+        $ins = $pdo->prepare("INSERT INTO settings (`key`, `value`, `group`, created_at) VALUES ('url_path_prefix', 'img', 'storage', NOW())");
+        $ins->execute();
+    }
+} catch (Throwable $e) {
+    // 静默跳过
 }
