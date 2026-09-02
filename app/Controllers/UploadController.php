@@ -21,27 +21,37 @@ class UploadController
         // Phase 8: 取可见存储（多存储时显示下拉，单存储时自动选）
         $visibleStorages = \App\Drivers\StorageManager::listVisible();
 
-        // Phase 9: 取 Web 默认压缩档位（从 compression_profiles 取 code）
-        $webProfileId = (int)config('settings.web_compression_profile_id', 0);
-        $webProfile = null;
-        if ($webProfileId > 0) {
-            $webProfile = \App\Core\Db::fetchOne(
-                'SELECT code, name FROM compression_profiles WHERE id = :id AND enabled = 1',
-                ['id' => $webProfileId]
-            );
-        }
-        $defaultQuality = $webProfile['code'] ?? 'balanced';
-
-        // v1.3.8: 取全部启用的压缩档（用于上传页 quality 下拉，避免 mega/custom 等档被漏）
-        $allProfiles = \App\Core\Db::fetchAll(
-            'SELECT id, code, name, max_dimension, jpeg_quality, output_format, target_size_kb
-             FROM compression_profiles WHERE enabled = 1 ORDER BY sort_order ASC, id ASC'
-        );
-
         // Phase 9.3: 浏览器上传压缩模式（double=双重 / browser=仅浏览器 / backend=仅后端）
         $browserMode = (string)config('settings.browser_upload_mode', 'browser');
         if (!in_array($browserMode, ['double', 'browser', 'backend'], true)) {
             $browserMode = 'browser';
+        }
+
+        // v1.3.8 重做：上传页 quality 下拉根据 browser_mode 切换选项
+        // - browser/double 模式：用前端 QUALITY_PRESETS 5 档（独立体系，JS 5 档对应）
+        // - backend 模式：用后端 compression_profiles 全档（按 code 查后端）
+        // desc 必须严格跟 public/assets/upload.js QUALITY_PRESETS 数值一致！
+        $browserPresets = [
+            ['code' => 'original', 'name' => '原图', 'desc' => '不压缩'],
+            ['code' => 'high',     'name' => '高清', 'desc' => '2048px / 0.85'],
+            ['code' => 'balanced', 'name' => '⭐ 均衡', 'desc' => '1600px / 0.70'],
+            ['code' => 'saver',    'name' => '省流', 'desc' => '1200px / 0.55'],
+            ['code' => 'extreme',  'name' => '极限省流', 'desc' => '900px / 0.40'],
+        ];
+        $serverProfiles = \App\Core\Db::fetchAll(
+            'SELECT id, code, name, max_dimension, jpeg_quality, output_format, target_size_kb
+             FROM compression_profiles WHERE enabled = 1 ORDER BY sort_order ASC, id ASC'
+        );
+
+        // 默认档：backend 模式用 web_compression_profile_id 对应 code，browser/double 模式用 'balanced'
+        if ($browserMode === 'backend') {
+            $webProfileId = (int)config('settings.web_compression_profile_id', 0);
+            $webProfile = $webProfileId > 0
+                ? \App\Core\Db::fetchOne('SELECT code FROM compression_profiles WHERE id = :id AND enabled = 1', ['id' => $webProfileId])
+                : null;
+            $defaultQuality = $webProfile['code'] ?? 'saver';
+        } else {
+            $defaultQuality = 'balanced';  // 浏览器压缩默认均衡
         }
 
         Response::view('upload/index', [
@@ -50,7 +60,8 @@ class UploadController
             'albums'  => $folders,
             'visible_storages' => $visibleStorages,
             'default_quality'  => $defaultQuality,
-            'all_profiles'     => $allProfiles,
+            'browser_presets'  => $browserPresets,
+            'server_profiles'  => $serverProfiles,
             'browser_mode'     => $browserMode,
         ], 'main');
     }
@@ -93,7 +104,8 @@ class UploadController
             $browserMode = 'browser';
         }
         $opts = [
-            'quality'    => $request->post('quality', 'balanced'),
+            // v1.3.8: 默认 '' — JS dirty 方案要求不传 = '' = 走 web 默认档，'balanced' 会让 dirty 闭环失效
+            'quality'    => $request->post('quality', ''),
             'max_width'  => (int)$request->post('max_width', 0),
             'max_height' => (int)$request->post('max_height', 0),
             'skip_compress'  => $browserMode === 'browser' && $request->post('skip_compress') === '1',
@@ -107,25 +119,39 @@ class UploadController
             'storage_id' => (int)$request->post('storage_id', 0),  // Phase 8: 用户可手动选存储
         ];
 
-        // double/backend 模式：后端用 Web 默认档位压缩（而非前端 quality / API 档）
+        // double/backend 模式：后端压缩
+        // v1.3.8 重做：用户在前端 quality 选的具体档优先（按 code 查 DB），没传或查不到才用 Web 默认档
+        // - JS 用 qualityDirty 标记，只在用户改了 quality 时才传 quality
+        // - 后端不再有 'balanced' 特例（防止 backend 模式 balanced 档不可达）
         if ($browserMode !== 'browser') {
-            $webId = (int)config('settings.web_compression_profile_id', 0);
-            $webProfile = null;
-            if ($webId > 0) {
-                $webProfile = \App\Core\Db::fetchOne(
-                    'SELECT * FROM compression_profiles WHERE id = :id AND enabled = 1',
-                    ['id' => $webId]
+            $userQuality = (string)($opts['quality'] ?? '');
+            $userProfile = null;
+            if ($userQuality !== '') {
+                // 用户选了具体档 → 查 DB
+                $userProfile = \App\Core\Db::fetchOne(
+                    'SELECT * FROM compression_profiles WHERE code = :c AND enabled = 1 LIMIT 1',
+                    ['c' => $userQuality]
                 );
             }
-            if (!$webProfile) {
-                // 兜底：balanced 内置档
-                $webProfile = \App\Core\Db::fetchOne(
-                    "SELECT * FROM compression_profiles WHERE code = 'balanced' AND enabled = 1 ORDER BY id ASC LIMIT 1"
-                );
+            if (!$userProfile) {
+                // 兜底：web_compression_profile_id（settings 里的 Web 默认档）
+                $webId = (int)config('settings.web_compression_profile_id', 0);
+                if ($webId > 0) {
+                    $userProfile = \App\Core\Db::fetchOne(
+                        'SELECT * FROM compression_profiles WHERE id = :id AND enabled = 1',
+                        ['id' => $webId]
+                    );
+                }
+                if (!$userProfile) {
+                    // 终极兜底：balanced 内置档
+                    $userProfile = \App\Core\Db::fetchOne(
+                        "SELECT * FROM compression_profiles WHERE code = 'balanced' AND enabled = 1 ORDER BY id ASC LIMIT 1"
+                    );
+                }
             }
-            if (!empty($webProfile['id'])) {
-                $opts['_compression_profile'] = $webProfile;
-                $opts['quality'] = $webProfile['code'] ?? $opts['quality'];
+            if (!empty($userProfile['id'])) {
+                $opts['_compression_profile'] = $userProfile;
+                $opts['quality'] = $userProfile['code'] ?? $opts['quality'];
             }
         }
 

@@ -59,6 +59,8 @@
     }
 
     const pending = [];
+    // v1.3.8: dirty 标记 — 用户改了 quality 后才传 quality，后端才能区分「默认」和「显式选」
+    let qualityDirty = false;
     const uploaded = [];   // { id, url, name, size, delToken? }
 
     // === 拖拽 / 点击 / 粘贴 ===
@@ -118,22 +120,9 @@
      */
     async function recomputeItem(item, preset) {
         item.currentPreset = preset;
-        // v1.3.8 虾二号反馈 FAIL-1: 优先读 option dataset（DB 真实参数），没有才用 QUALITY_PRESETS fallback
-        let presetCfg;
-        const sel = document.getElementById('quality-select');
-        if (sel) {
-            const opt = Array.from(sel.options).find(o => o.value === preset);
-            if (opt && opt.dataset.maxdim !== undefined) {
-                presetCfg = {
-                    maxDim: parseInt(opt.dataset.maxdim, 10) || 0,
-                    quality: parseFloat(opt.dataset.quality) || 0.7,
-                    mime: opt.dataset.mime || 'image/jpeg',
-                };
-            }
-        }
-        if (!presetCfg) {
-            presetCfg = QUALITY_PRESETS[preset] || QUALITY_PRESETS.balanced;
-        }
+        // 浏览器压缩模式（browser/double）走前端 QUALITY_PRESETS
+        // 后端压缩模式（double/backend）用 preset code 调后端 API，按 DB compression_profiles 执行
+        const presetCfg = QUALITY_PRESETS[preset] || QUALITY_PRESETS.balanced;
         try {
             // Phase 9.3: 仅后端压缩模式 → 前端不压缩，原图直传
             if (isBackendOnly) {
@@ -179,6 +168,7 @@
      */
     if (qualitySelect) {
         qualitySelect.addEventListener('change', async () => {
+            qualityDirty = true;
             const newPreset = qualitySelect.value;
             for (const item of pending) {
                 if (item.currentPreset !== newPreset) {
@@ -288,7 +278,10 @@
             if (browserMode !== 'backend' && originalSize && originalSize > 0) {
                 fd.append('original_size', String(originalSize));
             }
-            fd.append('quality', qualitySelect.value);
+            // v1.3.8: dirty 标记 — 只在用户显式改了 quality 时才传，否则让后端用 web 默认档
+            if (qualityDirty) {
+                fd.append('quality', qualitySelect.value);
+            }
             fd.append('is_public', publicCheckbox && publicCheckbox.checked ? 1 : 0);
             const customPath = customPathInput ? customPathInput.value.trim() : '';
             if (customPath) fd.append('custom_path', customPath);

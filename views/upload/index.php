@@ -59,31 +59,37 @@
                 <label class="config-label">📐 图片压缩</label>
                 <?php
                 $dq = $default_quality ?? 'balanced';
-                // v1.3.8: 从 DB compression_profiles 渲染全部档位（避免 mega/custom 静默变 original）
-                $allProfiles = $all_profiles ?? [];
+                $bm = $browser_mode ?? 'browser';
+                $browserPresets = $browser_presets ?? [];
+                $serverProfiles = $server_profiles ?? [];
                 ?>
                 <select name="quality" id="quality-select" class="config-input">
-                    <?php foreach ($allProfiles as $p): ?>
-                        <?php
-                            $dim = (int)($p['max_dimension'] ?? 0);
-                            $qual = (int)($p['jpeg_quality'] ?? 0);
-                            $sizeKb = (int)($p['target_size_kb'] ?? 0);
-                            $sizeStr = $sizeKb > 0 ? ' · ≤' . round($sizeKb/1024, 1) . 'MB' : '';
-                            $dimStr = $dim > 0 ? "{$dim}px" : '原尺寸';
-                            $label = $p['name'] . ' (' . $dimStr . ' / q' . $qual . ')' . $sizeStr;
-                            if ((int)($p['is_builtin'] ?? 0) === 0) $label .= ' · 自定义';
-                            // v1.3.8 虾二号反馈 FAIL-1: 把 DB 参数塞进 data-* 让前端读
-                            $mime = ($p['output_format'] ?? 'auto') === 'auto' ? 'image/jpeg' : 'image/' . $p['output_format'];
-                            $qF = round($qual / 100, 2);  // 0.85 / 0.70 / 0.55 / 0.45
-                        ?>
-                        <option value="<?= h($p['code']) ?>"
-                                data-maxdim="<?= $dim ?>"
-                                data-quality="<?= $qF ?>"
-                                data-mime="<?= h($mime) ?>"
-                                <?= $dq === $p['code'] ? 'selected' : '' ?>><?= h($label) ?></option>
-                    <?php endforeach; ?>
+                    <?php if ($bm === 'backend'): ?>
+                        <?php foreach ($serverProfiles as $p): ?>
+                            <?php
+                                $dim = (int)($p['max_dimension'] ?? 0);
+                                $qual = (int)($p['jpeg_quality'] ?? 0);
+                                $sizeKb = (int)($p['target_size_kb'] ?? 0);
+                                $sizeStr = $sizeKb > 0 ? ' · ≤' . round($sizeKb/1024, 1) . 'MB' : '';
+                                $dimStr = $dim > 0 ? "{$dim}px" : '原尺寸';
+                                $label = $p['name'] . ' (' . $dimStr . ' / q' . $qual . ')' . $sizeStr;
+                                if ((int)($p['is_builtin'] ?? 0) === 0) $label .= ' · 自定义';
+                            ?>
+                            <option value="<?= h($p['code']) ?>" <?= $dq === $p['code'] ? 'selected' : '' ?>><?= h($label) ?></option>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <?php foreach ($browserPresets as $p): ?>
+                            <option value="<?= h($p['code']) ?>" <?= $dq === $p['code'] ? 'selected' : '' ?>><?= h($p['name']) ?> (<?= h($p['desc']) ?>)</option>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </select>
-                <div class="config-hint">默认档来自后台「压缩配置 → Web 默认档」设置</div>
+                <div class="config-hint">
+                    <?php if ($bm === 'backend'): ?>
+                        默认档来自后台「压缩配置 → Web 默认档」设置（后端执行压缩）
+                    <?php else: ?>
+                        浏览器内置压缩档（上传时由浏览器执行）
+                    <?php endif; ?>
+                </div>
             </div>
 
             <!-- Phase 9.3: 浏览器上传压缩模式（后台可切换） -->

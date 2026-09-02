@@ -46,3 +46,9 @@ Thumbs.db
 # 兜底：禁止把生产图目录纳入版本控制（凌晨事故教训）
 /public/img/*
 !/public/img/.gitkeep
+
+# v1.3.8: 用户图（无论 prefix 是 img/tu/rest/new 等都不入库）
+*.lock
+/public/**/*.{jpg,jpeg,png,gif,webp,bmp}
+/public/**/*.gitkeep
+/public/storage/
