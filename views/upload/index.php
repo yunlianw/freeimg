@@ -58,7 +58,7 @@
             <div class="config-item">
                 <label class="config-label">📐 图片压缩</label>
                 <?php
-                $dq = $default_quality ?? 'balanced';
+                $dq = $default_quality ?? 'saver';  // v1.3.9.1: 兜底 saver，跟 controller/UploadService/Installer 三方一致
                 $bm = $browser_mode ?? 'browser';
                 $browserPresets = $browser_presets ?? [];
                 $serverProfiles = $server_profiles ?? [];
@@ -86,6 +86,8 @@
                 <div class="config-hint">
                     <?php if ($bm === 'backend'): ?>
                         默认档来自后台「压缩配置 → Web 默认档」设置（后端执行压缩）
+                    <?php elseif ($bm === 'double'): ?>
+                        默认档来自后台「设置 → 默认压缩档位」（浏览器先压，后端再压，结果取字节数最小的）
                     <?php else: ?>
                         默认档来自后台「设置 → 默认压缩档位」（浏览器执行压缩）
                     <?php endif; ?>

@@ -17,10 +17,10 @@ FreeImg 所有版本更新日志。
 
 老季反馈「浏览器压缩可能 50KB，后端压缩反而 100KB」+「后台默认压缩档位改了但上传页默认不跟着变」。
 
-**1. 双重压缩「取小」方案**（老季提出，虾二号审查通过）
+**1. 双重压缩「取小」方案**（老季提出，虾二号审查超时未完成 → 牛马一号自测端到端验证 + 虾二号复审复现 PASS）
 - 双重压缩模式（browser_upload_mode='double'）：前端先按 QUALITY_PRESETS 压 → 后端再压 → **取字节数最小的那个**
-- 核心逻辑：CompressionChain.php 第 207 行 `$cmpSize >= $srcSize` 已有，**不动业务代码，只修隐藏坑**
-- **隐藏坑**（虾二号发现）：strip_exif=1 时保留原图分支会强制 q92 重写剥 EXIF，把前端 50KB 变 150KB，「取小」失效
+- 核心逻辑：CompressionChain.php 第 209 行 `$cmpSize >= $srcSize` 已有，**不动业务代码，只修隐藏坑**
+- **隐藏坑**（虾二号设计阶段发现）：strip_exif=1 时保留原图分支会强制 q92 重写剥 EXIF，把前端 50KB 变 150KB，「取小」失效
 - **修复**（UploadService.php + CompressionChain.php）：
   - 新增 `$inputFromBrowser` 判定：前端已压过图（`skipByBrowser` 或 `original_size !== realSize`）
   - chain 收 `strip_exif=0` → 保留原图分支不再重写剥 EXIF → 真正保留前端小图
@@ -29,13 +29,46 @@ FreeImg 所有版本更新日志。
 
 **2. 上传页默认档读 settings**
 - 之前 v1.3.8 browser/double 模式上传页默认**写死 'balanced'**，后台「设置 → 默认压缩档位」改不了
-- **修复**（UploadController.php）：读 `settings.default_compression`，白名单 5 档（原图/高清/均衡/省流/极限），兜底 balanced
-- view hint 文案同步：「默认档来自后台「设置 → 默认压缩档位」」
+- **修复**（UploadController.php）：读 `settings.default_compression`，白名单 5 档（原图/高清/均衡/省流/极限），兜底 saver（v1.3.9.1：跟 UploadService L86 + Installer seed 统一）
+- view hint 文案按 mode 分三套（browser / double / backend）：
+  - browser 模式：「浏览器执行压缩」
+  - double 模式：「浏览器先压，后端再压，结果取字节数最小的」
+  - backend 模式：「后端执行压缩」
 - 老季本机 `default_compression=saver` → 现在打开 https://pic.5276.net/upload 默认显示「省流」
 
-**审查**：龙虾二号 2 分钟审查 + 1 分钟方案评估，全部 PASS。
+**审查**：虾二号审查超时 → 牛马一号自测端到端 PASS（1197 字节极小图 + saver profile → preserved_original=true 保留前端）→ 虾二号复审复现 PASS（v1.3.9.1 补签）。
 
 ---
+
+## [v1.3.8] - 2026-09-02
+
+### 🐛 BUG 修复：后台设置全面清理（21 项 + 2 FAIL 修复）
+
+老季需求：后台设置参数是否灵活 / 硬编码 / 过期提示 / 改设置不生效的地方 + 纯净版安装包默认值跟开发环境一致。
+
+**改动**（21 项）：P0 4 个（extreme→mega 别名、上传页 quality 下拉读 DB、删"Phase 3 实现"、upload.js prefix 写死）+ P1 8 个 + P2 9 个。
+
+**重做**（老季反馈"浏览器压缩和 API 压缩是分开的"）：
+- browser/double 模式：上传页用前端 QUALITY_PRESETS 5 档（独立体系）
+- backend 模式：上传页用后端 DB compression_profiles 全档
+- defaultQuality 分模式取
+- 引入 qualityDirty 标记（user 改 quality 后才传）+ 'balanced' 特例删除
+
+**虾二号 3 轮审查**：一审 FAIL-1（quality 下拉 vs QUALITY_PRESETS 不同步）+ FAIL-2（PHP 默认 'balanced' 让 dirty 失效）→ 二改断点 A（块级 let ReferenceError）+ 断点 B（默认值'balanced'）→ 三改全部 PASS。
+
+---
+
+## [v1.3.7.1] - 2026-09-02
+
+### 🐛 BUG 修复：图片列表物理路径显示
+
+老季实测：`url_path_prefix=tu` 时新图 `storage_path='tu/2026/09/...'`，物理 `public/tu/...`，但 `views/images/index.php:79` 写死 `public/img/` 前缀，显示成 `public/img/tu/...`。
+
+**修复**（1 处）：直接 `public/` + storage_path 显示，跟 prefix 解耦。
+
+---
+
+
 
 ## [v1.3.7] - 2026-09-02
 

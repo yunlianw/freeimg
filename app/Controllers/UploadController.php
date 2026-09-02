@@ -53,9 +53,11 @@ class UploadController
         } else {
             // v1.3.9: browser/double 模式读 settings.default_compression（白名单 = 前端 5 档）
             // 之前 v1.3.8 写死 'balanced'，导致后台改了没用
-            $defaultQuality = (string)config('settings.default_compression', 'balanced');
+            // v1.3.9.1: 兜底从 'balanced' 改 'saver'，跟 UploadService L86 + Installer seed 一致
+            // 老库没该行（upgrade.php 从未补种过）会触发兜底，统一 saver 避免 UI/实际档位不一致
+            $defaultQuality = (string)config('settings.default_compression', 'saver');
             if (!in_array($defaultQuality, ['original', 'high', 'balanced', 'saver', 'extreme'], true)) {
-                $defaultQuality = 'balanced';
+                $defaultQuality = 'saver';
             }
         }
 
