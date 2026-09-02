@@ -9,7 +9,7 @@ use App\Middleware\AuthMiddleware;
 
 /**
  * 存储扫描与清理
- * 扫描 public/storage/images/ 下的所有图片，对比数据库
+ * 从 storages 表读所有 local 驱动的真实 basePath，扫描磁盘图片，对比数据库
  * - DB 有但磁盘没 → 孤儿记录（可清理）
  * - 磁盘有但 DB 没 → 孤儿文件（可清理）
  */

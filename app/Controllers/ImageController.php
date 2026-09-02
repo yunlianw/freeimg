@@ -50,8 +50,8 @@ class ImageController
     }
 
     /**
-     * 扫描 public/img/ 下的真实物理子目录
-     * 返回 [{name: 'covers', path: 'covers'}, ...]
+     * 扫描 public/{prefix}/ 下的真实物理子目录（prefix 来自 url_path_prefix，支持多级如 img/tu）
+     * 返回 [{name: '2026', path: '2026'}, ...]
      */
     private function scanPhysicalDirs(): array
     {

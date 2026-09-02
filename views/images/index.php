@@ -72,14 +72,7 @@
                     <img src="<?= htmlspecialchars($img['public_url']) ?>" alt="<?= htmlspecialchars($img['original_name']) ?>" loading="lazy">
                     <div class="image-card-info">
                         <div class="image-card-name"><?= htmlspecialchars($img['original_name']) ?></div>
-                        <?php
-                            // 兼容老数据：storage_path 可能带 'img/' 前缀（历史遗留），显示时去掉
-                            $displayPath = (string)$img['storage_path'];
-                            if (str_starts_with($displayPath, 'img/')) {
-                                $displayPath = substr($displayPath, 4);
-                            }
-                        ?>
-                        <div class="image-card-path" title="物理路径">📁 public/img/<?= htmlspecialchars($displayPath) ?></div>
+                        <div class="image-card-path" title="物理路径">📁 public/<?= htmlspecialchars((string)$img['storage_path']) ?></div>
                         <div class="image-card-meta">
                             <span><?= number_format($img['final_size'] / 1024, 1) ?> KB</span>
                             <span class="saved">↓ <?= round((1 - $img['compression_ratio']) * 100, 0) ?>%</span>
