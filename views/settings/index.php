@@ -168,8 +168,14 @@
             <label>水印图片</label>
             <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
                 <input type="file" name="watermark_image" accept="image/png,image/jpeg,image/webp">
-                <?php if (file_exists(FREEIMG_ROOT . '/public/storage/watermark/logo.png')): ?>
-                    <img src="/storage/watermark/logo.png" alt="当前水印图" style="max-height:48px; border:1px solid var(--gray-300); border-radius:6px; background:repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0/16px 16px;">
+                <?php
+                // v1.4.1: base64 inline 显示（之前 src="/storage/..." 被 nginx deny 后台永远 403）
+                $wmLogo = FREEIMG_ROOT . '/public/storage/watermark/logo.png';
+                if (file_exists($wmLogo)):
+                    $wmMime = function_exists('mime_content_type') ? mime_content_type($wmLogo) : 'image/png';
+                    $wmData = base64_encode((string)file_get_contents($wmLogo));
+                ?>
+                    <img src="data:<?= h($wmMime) ?>;base64,<?= h($wmData) ?>" alt="当前水印图" style="max-height:48px; border:1px solid var(--gray-300); border-radius:6px; background:repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0/16px 16px;">
                     <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; color:var(--red-500);">
                         <input type="checkbox" name="watermark_image_remove" value="1"> 删除当前水印图
                     </label>
