@@ -11,6 +11,32 @@ FreeImg 所有版本更新日志。
 
 ---
 
+## [v1.3.9] - 2026-09-02
+
+### 🐛 BUG 修复：双重压缩「取小」+ 上传页默认档读设置
+
+老季反馈「浏览器压缩可能 50KB，后端压缩反而 100KB」+「后台默认压缩档位改了但上传页默认不跟着变」。
+
+**1. 双重压缩「取小」方案**（老季提出，虾二号审查通过）
+- 双重压缩模式（browser_upload_mode='double'）：前端先按 QUALITY_PRESETS 压 → 后端再压 → **取字节数最小的那个**
+- 核心逻辑：CompressionChain.php 第 207 行 `$cmpSize >= $srcSize` 已有，**不动业务代码，只修隐藏坑**
+- **隐藏坑**（虾二号发现）：strip_exif=1 时保留原图分支会强制 q92 重写剥 EXIF，把前端 50KB 变 150KB，「取小」失效
+- **修复**（UploadService.php + CompressionChain.php）：
+  - 新增 `$inputFromBrowser` 判定：前端已压过图（`skipByBrowser` 或 `original_size !== realSize`）
+  - chain 收 `strip_exif=0` → 保留原图分支不再重写剥 EXIF → 真正保留前端小图
+  - 真原图走原 strip_exif 逻辑（隐私安全）
+- 前端零改动
+
+**2. 上传页默认档读 settings**
+- 之前 v1.3.8 browser/double 模式上传页默认**写死 'balanced'**，后台「设置 → 默认压缩档位」改不了
+- **修复**（UploadController.php）：读 `settings.default_compression`，白名单 5 档（原图/高清/均衡/省流/极限），兜底 balanced
+- view hint 文案同步：「默认档来自后台「设置 → 默认压缩档位」」
+- 老季本机 `default_compression=saver` → 现在打开 https://pic.5276.net/upload 默认显示「省流」
+
+**审查**：龙虾二号 2 分钟审查 + 1 分钟方案评估，全部 PASS。
+
+---
+
 ## [v1.3.7] - 2026-09-02
 
 ### 🐛 BUG 修复：存储扫描彻底修对 + url_path_prefix 支持多级

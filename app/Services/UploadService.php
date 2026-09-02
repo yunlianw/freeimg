@@ -209,6 +209,9 @@ class UploadService
             // quality 用 85（视觉无损、避免 q92 膨胀），只重编码一次以应用水印
             $chainMaxW = $skipByBrowser ? 0 : $maxW;
             $chainQuality = $skipByBrowser ? 85 : $quality;
+            // v1.3.9: 双重压缩"取小"方案 — 前端已压过图（含 EXIF 已被 canvas 剥掉），
+            // 不再走 strip_exif 强制 q92 重写（会偷偷把前端小图撑大到 150~250KB）
+            $inputFromBrowser = $skipByBrowser || (!empty($opts['original_size']) && (int)$opts['original_size'] !== $realSize);
             $chainResult = $chain->process($tempSrc, $realMime, !empty($opts['_api_compress']) ? 'api-server' : 'browser', [
                 'max_width'       => $chainMaxW,
                 'max_height'      => $skipByBrowser ? 0 : $maxH,
@@ -224,7 +227,8 @@ class UploadService
                 'output_format'   => (string)($profile['output_format'] ?? 'auto'),
                 // strip_metadata 已废弃：GD 重编码本身就不写 EXIF/IPTC/XMP（GdProcessor 删了死代码）。
                 // 用 strip_exif（chain 层）统一控制剥 EXIF。
-                'strip_exif'      => (int)(config('settings.strip_exif') ?? 1),
+                // v1.3.9: 前端已压缩的图（double 模式）→ 不剥 EXIF，保留前端小体积
+                'strip_exif'      => $inputFromBrowser ? 0 : (int)(config('settings.strip_exif') ?? 1),
                 'watermark'       => WatermarkConfigResolver::resolve(),
             ]);
             // 重要：不要在这里 unlink($tempSrc)！chain 复制了 tempSrc 到自己的 tempIn 工作目录

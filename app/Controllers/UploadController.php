@@ -43,7 +43,7 @@ class UploadController
              FROM compression_profiles WHERE enabled = 1 ORDER BY sort_order ASC, id ASC'
         );
 
-        // 默认档：backend 模式用 web_compression_profile_id 对应 code，browser/double 模式用 'balanced'
+        // 默认档：backend 模式用 web_compression_profile_id 对应 code，browser/double 模式用 settings.default_compression
         if ($browserMode === 'backend') {
             $webProfileId = (int)config('settings.web_compression_profile_id', 0);
             $webProfile = $webProfileId > 0
@@ -51,7 +51,12 @@ class UploadController
                 : null;
             $defaultQuality = $webProfile['code'] ?? 'saver';
         } else {
-            $defaultQuality = 'balanced';  // 浏览器压缩默认均衡
+            // v1.3.9: browser/double 模式读 settings.default_compression（白名单 = 前端 5 档）
+            // 之前 v1.3.8 写死 'balanced'，导致后台改了没用
+            $defaultQuality = (string)config('settings.default_compression', 'balanced');
+            if (!in_array($defaultQuality, ['original', 'high', 'balanced', 'saver', 'extreme'], true)) {
+                $defaultQuality = 'balanced';
+            }
         }
 
         Response::view('upload/index', [

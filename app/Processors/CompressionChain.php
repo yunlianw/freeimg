@@ -201,12 +201,15 @@ class CompressionChain
         // 比大小：压缩后 >= 原图 → 保留原图
         // 例外：启用水印时不能保留原图（水印已画在 .cmp 上，保留原图=丢水印）
         // strip_exif 不影响大小判断：保留原图 = EXIF 自然不会泄露（用户上传时 EXIF 本就保留在原图副本路径里）
+        // v1.3.9: 上游 inputFromBrowser=1（double 模式前端已压）→ strip_exif=0 已传，$stripExif=false，
+        //          下面 stripExifRewrite 不会跑，"取小"方案生效
         $cmpSize = (int)($result['size'] ?? 0);
         $hasWatermark = !empty($opts['watermark']) && is_array($opts['watermark']);
         $stripExif = !empty($opts['strip_exif']);
         if ($cmpSize >= $srcSize && !$hasWatermark) {
             @unlink($tmpDest);
             // P0 安全修复：保留原图前若 strip_exif 开启 → 必须先剥 EXIF（GPS/设备信息会泄露）
+            // v1.3.9: 上游已判定 inputFromBrowser→0，$stripExif 为 false，本块跳过 → 保留前端小图
             if ($stripExif && in_array($realMime, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true)) {
                 $rw = $this->stripExifRewrite($tempIn, $realMime);
                 if ($rw['success']) {
