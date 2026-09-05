@@ -9,7 +9,69 @@ FreeImg 所有版本更新日志。
 
 ## [Unreleased]
 
+## [v1.4.1] - 2026-09-06
+
+### 🐛 BUG 修复：后台「活跃会话」设置不生效，2 小时必踢
+
+老季反馈：后台把"活跃会话"改成 240 小时，重新登录不到 2 小时就被踢回登录页。多次循环。
+
+**根本原因（牛马一号定位）**：
+- DB 端 `settings.session_ttl_hours=240` ✅ 生效（user_sessions.expires_at 确实按 240h 算了，9/5 20:30 的 session 活到 9/15）
+- PHP session cookie 端 ❌ 没生效：`public/index.php` 早期只设了 `session.gc_maxlifetime=7200`（来自 config.php `session.lifetime=7200`），**没设 cookie_lifetime** → 走 PHP 默认 `cookie_lifetime=0`（会话级 cookie，关闭浏览器就丢）
+- 后果：`$_SESSION['session_token']` 这把钥匙装在 PHP session 文件里，cookie 2 小时过期 → 钥匙丢 → AuthMiddleware 找不到 DB session → 踢回登录页
+- **DB TTL 和 PHP session TTL 是两套独立机制，必须同时改**
+
+**修复（public/index.php，单文件单点改动）**：
+- 新增 TTL 计算链：`SessionService::ttlSeconds()`（读 DB）→ config.php `session.lifetime` → 24h 保底
+- 显式 `ini_set('session.cookie_lifetime', ...)` + `session_set_cookie_params(['lifetime' => ...])`，让 PHP session cookie 持久化
+- `gc_maxlifetime` 也同步改成相同值（避免服务端 GC 比 cookie 早）
+- 保底 1 小时（防 config.php `lifetime=7200` 的旧默认值让"活跃会话"看起来没生效）
+
+**产品语义确认（老季明确）**：
+- ✅ **绝对上限**：登录后固定 TTL 到期，后台改设置**不影响已登录会话**
+- 例：9/5 20:30 老季登录（设的 10 天），到 9/15 20:30 必过期重登
+- 9/10 老季把设置改成 20 天 → 老季 9/5 的 session 不会自动续期，仍 9/15 到期
+- 只有 9/10 **之后**新登录的 session 才享受 20 天
+- DB 端 SessionService::touch() 滑动过期不影响表现（cookie 是绝对上限）
+
+**端到端验证（生产环境 curl 实测）**：
+```
+修复前: Set-Cookie: ... (无 expires / Max-Age=0，会话级 cookie)
+修复后: Set-Cookie: FREEIMG_SESS=...; expires=Tue, 15 Sep 2026 16:13:00 GMT; 
+         Max-Age=864000; path=/; HttpOnly; SameSite=Lax
+         ↑ 240h × 3600s = 864000s ✅
+```
+
+**审查**：虾二号审查 PASS（5/5 项），建议直接复用 `SessionService::ttlSeconds()` — 已采纳
+
+**修改文件**：1 个
+- `public/index.php`（备份：`public/index.php.backup.20260906_001200`）
+
 ---
+
+## [v1.4.0] - 2026-09-02
+
+### 🐛 BUG 修复：后台水印预览图 403
+老季反馈：后台 → 设置 → 图像水印，上传 logo 后预览图 403。
+**原因**：`img src="/storage/watermark/logo.png"` 被 nginx `deny all` 规则屏蔽了 `public/storage/`。
+**修复**（views/settings/index.php）：
+- PHP 读 logo 文件 → `base64_encode` → `data: URI` inline
+- 不走 HTTP，不受 nginx deny 影响
+- `function_exists('mime_content_type')` 兜底兼容老环境
+- `h()` 转义双重保险
+
+### 🧹 清理散落备份 + 建立 backups/ 目录
+- 删除 `app/Controllers/ApiKeyController.php.bak.212455`（293 行残留）
+- 删除 `tests/compression.php`（134 行测试脚本遗留）
+- 删除 `tests/sample_real_screenshot.png.final`（0 字节空文件）
+- 新增 `.gitignore` 规则屏蔽未来备份文件
+- 新增 `backups/` 目录集中存放手动备份
+
+**版本升级原因（minor）**：清理历史包袱 + 水印关键 BUG 修复，属 minor 升级（老季 9/2 确认）。
+
+---
+
+## [v1.3.9] - 2026-09-02
 
 ## [v1.3.9] - 2026-09-02
 

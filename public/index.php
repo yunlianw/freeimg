@@ -38,14 +38,44 @@ if (!is_installed()) {
     $config = require FREEIMG_ROOT . '/config/config.php';
 
     // Session 配置
+    // v1.4.1 修复：PHP session cookie 寿命必须跟 DB session TTL 一致，
+    // 否则 DB 里 session_token 还活着，PHP session cookie 先过期 → 被踢
+    // 优先用 SessionService::ttlSeconds()（DB settings.session_ttl_hours，缺失时默认 24h），
+    // 回退到 config.php session.lifetime
+    // 语义：绝对上限（登录后固定 TTL 到期），后台改 TTL 不影响已登录会话，只影响新登录
+    $sessionTtlSeconds = 0;
+    try {
+        if (class_exists('App\\Services\\SessionService')) {
+            $sessionTtlSeconds = \App\Services\SessionService::ttlSeconds();
+        }
+    } catch (\Throwable $e) {
+        // 安装中 / Db 未就绪 → 忽略
+    }
+    if ($sessionTtlSeconds <= 0) {
+        $sessionTtlSeconds = (int)($config['session']['lifetime'] ?? 7200);
+    }
+    if ($sessionTtlSeconds < 3600) {
+        $sessionTtlSeconds = 3600; // 保底 1 小时，防 7200 秒默认让"活跃会话"设置看起来没生效
+    }
+
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Lax');
-    ini_set('session.gc_maxlifetime', (string)($config['session']['lifetime'] ?? 7200));
+    ini_set('session.gc_maxlifetime', (string)$sessionTtlSeconds);
+    ini_set('session.cookie_lifetime', (string)$sessionTtlSeconds); // 持久 cookie，关闭浏览器不丢
     if (!empty($config['session']['cookie_secure'])) {
         ini_set('session.cookie_secure', '1');
     }
     session_name($config['session']['name'] ?? 'FREEIMG_SESS');
     if (session_status() === PHP_SESSION_NONE) {
+        // 显式设置 cookie lifetime（ini_set 必须在 session_start 之前；保险起见再调一次）
+        session_set_cookie_params([
+            'lifetime' => $sessionTtlSeconds,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => !empty($config['session']['cookie_secure']),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
         session_start();
     }
 
